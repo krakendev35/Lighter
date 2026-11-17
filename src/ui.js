@@ -13,7 +13,11 @@ const ICONS = {
   clay: '<circle cx="9" cy="8" r="5"/><path d="M4.5 15.5h9"/>',
   grid: '<rect x="2.5" y="2.5" width="13" height="13" rx="1"/><path d="M2.5 7h13M2.5 11h13M7 2.5v13M11 2.5v13"/>',
   axes: '<path d="M5.5 12.5V2.5M5.5 12.5h10M5.5 12.5 2 16"/>',
+  screenshot:
+    '<rect x="2.5" y="5" width="13" height="9.5" rx="1"/><circle cx="9" cy="9.75" r="2.5"/><path d="M6.5 5l1-2h3l1 2"/>',
   theme: '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
+  play: '<path d="M6 4v10l8-5z" fill="currentColor"/>',
+  pause: '<path d="M6.5 4.5v9M11.5 4.5v9"/>',
 };
 
 // '|' = divider between button groups.
@@ -28,15 +32,19 @@ const BUTTONS = [
   { id: 'grid', title: 'Grid (G)' },
   { id: 'axes', title: 'Axes' },
   '|',
+  { id: 'screenshot', title: 'Save screenshot (PNG)' },
   { id: 'theme', title: 'Light / dark theme' },
 ];
 
+// [key, label, extra class]; "anim-only" hints show only for animated models.
 const HINTS = [
   ['W', 'Wireframe'],
   ['E', 'Edges'],
   ['C', 'Clay'],
   ['G', 'Grid'],
   ['F', 'Fit'],
+  ['← →', 'Prev/next'],
+  ['Space', 'Play/pause', 'anim-only'],
 ];
 
 /**
@@ -70,7 +78,72 @@ export function setupTopbar(container, actions, isActive) {
 }
 
 export function setupHints(container) {
-  container.innerHTML = HINTS.map(([key, label]) => `<span><kbd>${key}</kbd>${label}</span>`).join('');
+  container.innerHTML = HINTS.map(
+    ([key, label, cls = '']) => `<span class="${cls}"><kbd>${key}</kbd>${label}</span>`,
+  ).join('');
+}
+
+/**
+ * Animation bar: play/pause, timeline slider, time, and a clip picker when
+ * the model has more than one animation. Reads `viewer.player` every frame.
+ * Returns reset(), to call after a new model is loaded.
+ */
+export function setupPlayer(container, viewer) {
+  container.innerHTML = `
+    <button type="button" class="icon-btn" id="play-btn" aria-label="Play / pause (Space)" title="Play / pause (Space)"></button>
+    <input type="range" id="timeline" min="0" max="1" step="0.001" value="0" aria-label="Timeline" />
+    <span id="anim-time"></span>
+    <select id="clip-select" aria-label="Animation"></select>`;
+  const playBtn = container.querySelector('#play-btn');
+  const slider = container.querySelector('#timeline');
+  const timeEl = container.querySelector('#anim-time');
+  const select = container.querySelector('#clip-select');
+  let dragging = false;
+  let shownPlaying = null;
+
+  const fmt = (t) => {
+    const m = Math.floor(t / 60);
+    const s = (t % 60).toFixed(1).padStart(4, '0');
+    return `${m}:${s}`;
+  };
+
+  playBtn.addEventListener('click', () => viewer.player?.toggle());
+  slider.addEventListener('pointerdown', () => (dragging = true));
+  slider.addEventListener('pointerup', () => (dragging = false));
+  slider.addEventListener('input', () => viewer.player?.seek(Number(slider.value)));
+  select.addEventListener('change', () => {
+    viewer.player?.select(Number(select.value));
+    reset();
+  });
+
+  viewer.onFrame(() => {
+    const p = viewer.player;
+    if (!p) return;
+    if (shownPlaying !== p.playing) {
+      shownPlaying = p.playing;
+      playBtn.innerHTML = `<svg viewBox="0 0 18 18" width="18" height="18">${p.playing ? ICONS.pause : ICONS.play}</svg>`;
+    }
+    if (!dragging) slider.value = p.time;
+    timeEl.textContent = `${fmt(p.time)} / ${fmt(p.duration)}`;
+  });
+
+  function reset() {
+    const p = viewer.player;
+    document.body.classList.toggle('has-animation', !!p);
+    if (!p) return;
+    slider.max = p.duration;
+    select.innerHTML = p.clips
+      .map((c, i) => `<option value="${i}">${escapeHtml(c.name || `Animation ${i + 1}`)}</option>`)
+      .join('');
+    select.value = p.index;
+    select.hidden = p.clips.length < 2;
+    shownPlaying = null;
+  }
+  return reset;
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 }
 
 /**
@@ -127,14 +200,20 @@ export function setupShortcuts(actions) {
       return;
     }
     if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+    // Let the timeline slider / clip picker keep their own arrow keys.
+    if (e.target.closest?.('input, select')) return;
     const key = {
       w: 'toggleWireframe',
       e: 'toggleEdges',
       c: 'clay',
       g: 'grid',
       f: 'fit',
+      ' ': 'playPause',
+      arrowleft: 'previousFile',
+      arrowright: 'nextFile',
     }[e.key.toLowerCase()];
-    if (key) actions[key]();
-    // TODO (milestone 5): ← → previous / next file
+    if (!key) return;
+    e.preventDefault(); // Space would otherwise "click" the last focused button
+    actions[key]();
   });
 }

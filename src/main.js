@@ -2,7 +2,7 @@
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
-import { setupTopbar, setupHints, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
+import { setupTopbar, setupHints, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
@@ -13,37 +13,51 @@ const fileInput = document.getElementById('file-input');
 
 /* ---------------- Opening files ---------------- */
 
+// What is open right now: `path` in the desktop app; in the plain browser,
+// the dropped models (for ← →) and the resolver for their textures.
+const current = { name: null, path: null, browserModels: [], browserResolve: null };
+
+// Each load gets a number; when several overlap (holding → for example),
+// only the newest one is shown.
+let loadCounter = 0;
+
 /**
  * Show a model from raw bytes + its file name.
  * `resolve` finds the textures / .mtl / .bin files the model refers to.
  */
-async function showModel(buffer, name, resolve = null) {
+async function showModel(buffer, name, resolve = null, path = null) {
   const format = extensionOf(name);
   if (!SUPPORTED.includes(format)) {
     console.warn(`Unsupported file: ${name}`);
     return;
   }
+  const loadId = ++loadCounter;
   try {
-    const { object } = await loadModel(buffer, name, resolve);
-    viewer.setModel(object);
+    const { object, animations } = await loadModel(buffer, name, resolve);
+    if (loadId !== loadCounter) return; // a newer file was opened meanwhile
+    viewer.setModel(object, animations);
+    Object.assign(current, { name, path });
     document.body.classList.add('has-model');
     setFileInfo(name, viewer.stats(), { format, bytes: buffer.byteLength });
     setWindowTitle(`${name} — Lighter`);
+    resetPlayer();
   } catch (err) {
     console.error(err);
   }
 }
 
 const isModel = (name) => SUPPORTED.includes(extensionOf(name));
+const naturalOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }).compare;
 
 /**
  * Open browser File objects (plain-browser drop / file picker). The first
- * model is shown; the other files (textures, .mtl, .bin) are available to it.
+ * model is shown; the other files (textures, .mtl, .bin) are available to it,
+ * and ← → step through all dropped models.
  */
 let blobUrls = [];
 async function openFiles(files) {
-  const model = files.find((f) => isModel(f.name));
-  if (!model) return;
+  const models = files.filter((f) => isModel(f.name)).sort((a, b) => naturalOrder(a.name, b.name));
+  if (!models.length) return;
 
   blobUrls.forEach((u) => URL.revokeObjectURL(u));
   blobUrls = [];
@@ -53,7 +67,13 @@ async function openFiles(files) {
     blobUrls.push(url);
     return url;
   });
-  showModel(await model.arrayBuffer(), model.name, resolve);
+  current.browserModels = models;
+  current.browserResolve = resolve;
+  openBrowserModel(models[0]);
+}
+
+async function openBrowserModel(file) {
+  showModel(await file.arrayBuffer(), file.name, current.browserResolve);
 }
 
 /** Open a file by its path on disk (desktop app only). */
@@ -69,10 +89,58 @@ async function openPath(path) {
       console.warn('Textures next to the model are unavailable:', err);
     }
     const buffer = await invoke('read_file', { path });
-    showModel(buffer, path.split(/[\\/]/).pop(), resolve);
+    showModel(buffer, path.split(/[\\/]/).pop(), resolve, path);
   } catch (err) {
     console.error(err);
   }
+}
+
+/** ← → : open the previous / next model in the same folder (wraps around). */
+async function stepFile(delta) {
+  if (!current.name) return;
+
+  if (!IN_TAURI) {
+    const list = current.browserModels;
+    if (list.length < 2) return;
+    const i = list.findIndex((f) => f.name === current.name);
+    openBrowserModel(list[(i + delta + list.length) % list.length]);
+    return;
+  }
+
+  // Desktop: list the folder fresh each time, so new/deleted files are noticed.
+  const { invoke } = await import('@tauri-apps/api/core');
+  const dir = current.path.replace(/[\\/][^\\/]*$/, '');
+  const names = (await invoke('list_folder', { path: current.path })).filter(isModel).sort(naturalOrder);
+  if (names.length < 2) return;
+  const i = names.findIndex((n) => n.toLowerCase() === current.name.toLowerCase());
+  openPath(`${dir}\\${names[(i + delta + names.length) % names.length]}`);
+}
+
+/** Save the current view as a PNG (3D view only, no UI). */
+async function saveScreenshot() {
+  if (!current.name) return;
+  const blob = await viewer.screenshot();
+  const fileName = `${current.name.replace(/\.[^.]+$/, '')}.png`;
+
+  if (!IN_TAURI) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return;
+  }
+
+  // Desktop: native Save dialog, starting in the model's folder.
+  const { save } = await import('@tauri-apps/plugin-dialog');
+  const dir = current.path.replace(/[\\/][^\\/]*$/, '');
+  const target = await save({
+    defaultPath: `${dir}\\${fileName}`,
+    filters: [{ name: 'PNG image', extensions: ['png'] }],
+  });
+  if (!target) return;
+  const { writeFile } = await import('@tauri-apps/plugin-fs');
+  await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
 }
 
 /** Several paths dropped at once: open the first model among them. */
@@ -159,6 +227,10 @@ const actions = {
   axes: withRefresh(() => viewer.toggleAxes()),
   theme: withRefresh(() => applyTheme(viewer.theme === 'dark' ? 'light' : 'dark')),
   fit: () => viewer.frame({ keepDirection: true }),
+  screenshot: () => saveScreenshot().catch((err) => console.error('Screenshot failed:', err)),
+  playPause: () => viewer.player?.toggle(),
+  previousFile: () => stepFile(-1).catch(console.error),
+  nextFile: () => stepFile(1).catch(console.error),
 };
 
 const isActive = (id) =>
@@ -174,7 +246,8 @@ const isActive = (id) =>
 refreshButtons = setupTopbar(document.getElementById('topbar-buttons'), actions, isActive);
 refreshButtons();
 setupHints(document.getElementById('hints'));
-setupAutoHide([document.getElementById('topbar'), document.getElementById('hints')]);
+const resetPlayer = setupPlayer(document.getElementById('player'), viewer);
+setupAutoHide(['topbar', 'hints', 'player'].map((id) => document.getElementById(id)));
 setupShortcuts(actions);
 
 /* ---------------- Drag & drop ---------------- */

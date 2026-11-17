@@ -49,16 +49,61 @@ html, body {
 #viewport canvas { display: block; }
 
 /* ---------- Auto-hiding controls ---------- */
-#topbar, #hints {
+#topbar, #hints, #player {
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms ease;
 }
 body.has-model.controls-visible #topbar,
-body.has-model.controls-visible #hints {
+body.has-model.controls-visible #hints,
+body.has-animation.controls-visible #player {
   opacity: 1;
   pointer-events: auto;
 }
+/* Hints that only apply to animated models (Space = play/pause). */
+#hints .anim-only { display: none; }
+body.has-animation #hints .anim-only { display: flex; }
+
+/* ---------- Animation player ---------- */
+#player {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  width: min(480px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 12px 4px 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+}
+body:not(.has-animation) #player { display: none; }
+#anim-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#clip-select {
+  max-width: 140px;
+  font: inherit; color: var(--text);
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+/* Monochrome timeline slider */
+#timeline {
+  flex: 1; min-width: 60px;
+  height: 16px; margin: 0;
+  -webkit-appearance: none; appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+#timeline::-webkit-slider-runnable-track { height: 2px; background: var(--border); border-radius: 1px; }
+#timeline::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; margin-top: -5px;
+  border-radius: 50%;
+  background: var(--text);
+  border: none;
+}
+#timeline:focus { outline: none; }
+#timeline:focus-visible::-webkit-slider-thumb { outline: 1px solid var(--text-2); outline-offset: 2px; }
 
 /* ---------- Top bar ---------- */
 #topbar {

@@ -70,6 +70,19 @@ fn collect_files(root: &Path, dir: &Path, depth: usize, out: &mut Vec<String>) {
     }
 }
 
+/// The file names (not folders) in the same folder as `path`. Used by the
+/// ← → keys; the frontend picks out the models and sorts them.
+#[tauri::command]
+fn list_folder(path: String) -> Result<Vec<String>, String> {
+    let dir = Path::new(&path).parent().ok_or("File has no parent folder")?;
+    let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+    Ok(entries
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -85,8 +98,9 @@ pub fn run() {
                 let _ = app.emit("open-file", path);
             }
         }))
-        .plugin(tauri_plugin_dialog::init()) // native Open dialog (Ctrl+O)
-        .invoke_handler(tauri::generate_handler![startup_file, read_file, index_folder])
+        .plugin(tauri_plugin_dialog::init()) // native Open / Save dialogs
+        .plugin(tauri_plugin_fs::init()) // writing the screenshot the user chose a place for
+        .invoke_handler(tauri::generate_handler![startup_file, read_file, index_folder, list_folder])
         .run(tauri::generate_context!())
         .expect("error while running Lighter");
 }
