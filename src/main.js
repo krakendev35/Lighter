@@ -4,32 +4,47 @@ import { ViewCube } from './viewcube.js';
 import { loadModel, extensionOf, SUPPORTED } from './loaders.js';
 import { setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
 
+const IN_TAURI = !!window.__TAURI_INTERNALS__;
+
 const viewer = new Viewer(document.getElementById('viewport'));
 new ViewCube(viewer);
 
 const emptyState = document.getElementById('empty');
 const fileInput = document.getElementById('file-input');
 
-async function openFile(file) {
-  if (!SUPPORTED.includes(extensionOf(file.name))) {
-    console.warn(`Unsupported file: ${file.name}`);
+/** Show a model from raw bytes + its file name. */
+async function showModel(buffer, name) {
+  if (!SUPPORTED.includes(extensionOf(name))) {
+    console.warn(`Unsupported file: ${name}`);
     return;
   }
   try {
-    const { object } = await loadModel(await file.arrayBuffer(), file.name);
+    const { object } = await loadModel(buffer, name);
     viewer.setModel(object);
     emptyState.classList.add('gone');
-    setFileInfo(file.name, viewer.stats());
-    setWindowTitle(`${file.name} — Lighter`);
+    setFileInfo(name, viewer.stats());
+    setWindowTitle(`${name} — Lighter`);
   } catch (err) {
     console.error(err);
   }
 }
 
+/** Open a browser File object (file picker, or drop when running in a plain browser). */
+async function openFile(file) {
+  showModel(await file.arrayBuffer(), file.name);
+}
+
+/** Open a file by its path on disk (desktop app only). */
+async function openPath(path) {
+  const { invoke } = await import('@tauri-apps/api/core');
+  const buffer = await invoke('read_file', { path });
+  showModel(buffer, path.split(/[\\/]/).pop());
+}
+
 async function setWindowTitle(title) {
   document.title = title;
   // In the desktop app also set the native window title.
-  if (window.__TAURI_INTERNALS__) {
+  if (IN_TAURI) {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     getCurrentWindow().setTitle(title);
   }
@@ -44,17 +59,33 @@ fileInput.addEventListener('change', () => {
 });
 
 // Drag & drop
-window.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  document.body.classList.add('dragging');
-});
-window.addEventListener('dragleave', () => document.body.classList.remove('dragging'));
-window.addEventListener('drop', (e) => {
-  e.preventDefault();
-  document.body.classList.remove('dragging');
-  const file = e.dataTransfer.files[0];
-  if (file) openFile(file);
-});
+const setDragging = (on) => document.body.classList.toggle('dragging', on);
+
+if (IN_TAURI) {
+  // Desktop app: Tauri handles the drop natively and gives us real file paths.
+  const { getCurrentWebview } = await import('@tauri-apps/api/webview');
+  getCurrentWebview().onDragDropEvent(({ payload }) => {
+    if (payload.type === 'enter' || payload.type === 'over') setDragging(true);
+    else if (payload.type === 'leave') setDragging(false);
+    else if (payload.type === 'drop') {
+      setDragging(false);
+      if (payload.paths.length) openPath(payload.paths[0]);
+    }
+  });
+} else {
+  // Plain browser (npm run dev): standard HTML5 drag & drop.
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    setDragging(true);
+  });
+  window.addEventListener('dragleave', () => setDragging(false));
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) openFile(file);
+  });
+}
 
 setupAutoHide(document.getElementById('topbar'));
 setupShortcuts({ open: pickFile, frame: () => viewer.frame() });
