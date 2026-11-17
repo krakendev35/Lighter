@@ -45,14 +45,14 @@ html, body {
   user-select: none;
 }
 
-#viewport { position: fixed; inset: 0; }
+#viewport { position: fixed; inset: 0; transition: right var(--slide); }
 #viewport canvas { display: block; }
 
 /* ---------- Auto-hiding controls ---------- */
 #topbar, #player {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity 200ms ease, right var(--slide), left var(--slide);
 }
 body.has-model.controls-visible #topbar,
 body.has-animation.controls-visible #player {
@@ -141,7 +141,7 @@ body[data-tool='zoom'] #viewport { cursor: ns-resize; }
 #viewcube {
   position: fixed; top: 16px; right: 16px;
   width: 96px; height: 96px;
-  transition: top 200ms ease;
+  transition: top 200ms ease, right var(--slide);
   display: none;
 }
 body.has-model #viewcube { display: block; }
@@ -153,8 +153,22 @@ body.controls-visible #viewcube { top: 64px; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   color: var(--text-2);
   pointer-events: none;
+  transition: right var(--slide);
 }
 body.has-model #empty { display: none; }
+
+/* Start screen intro: the cube draws itself, then the rest rises in, one
+   line after another. Runs once, when the app opens. */
+#empty > * { animation: rise 520ms var(--ease-out) both; }
+#empty > :nth-child(2) { animation-delay: 120ms; }
+#empty > :nth-child(3) { animation-delay: 170ms; }
+#empty > :nth-child(4) { animation-delay: 220ms; }
+#empty > :nth-child(5) { animation-delay: 270ms; }
+#empty > :nth-child(6) { animation-delay: 360ms; }
+#empty .cube { animation-duration: 400ms; }
+#empty .cube path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 900ms var(--ease-out) 80ms forwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
 #empty .cube { color: var(--text); margin-bottom: 8px; }
 #empty h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
 #empty p { margin: 0; }
@@ -172,13 +186,24 @@ body.dragging #empty { color: var(--text); }
 #start-hint .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border); }
 
 /* ---------- Guide side panel ---------- */
-#guide:not([hidden]) {
+/* Always in the page, parked just off the right edge; sliding it in and out
+   is a transform. `visibility` flips at the end of the slide-out so the
+   closed panel can't be tabbed into or clicked. */
+#guide {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: var(--guide-w);
   display: flex; flex-direction: column;
   background: var(--panel);
   border-left: 1px solid var(--border);
   z-index: 5;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform var(--slide), visibility 0s linear var(--slide-ms);
+}
+body.guide-open #guide {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--slide), visibility 0s;
 }
 #guide header {
   height: 48px; flex: 0 0 48px;
@@ -210,13 +235,29 @@ body.has-animation #guide .anim-only { display: block; }
 #guide footer .outline-btn { margin-top: 0; padding: 4px 10px; font-size: 11px; flex-shrink: 0; }
 #guide-toggle-note { white-space: nowrap; }
 
-/* While the guide is open everything else makes room for it. */
-:root { --guide-w: 300px; }
+/* While the guide is open everything else makes room for it, sliding over
+   the same time and curve as the panel. */
+:root {
+  --guide-w: 300px;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --slide-ms: 260ms;
+  --slide: var(--slide-ms) var(--ease-out);
+}
 body.guide-open #viewport,
 body.guide-open #topbar,
 body.guide-open #empty { right: var(--guide-w); }
 body.guide-open #viewcube { right: calc(var(--guide-w) + 16px); }
 body.guide-open #player { left: calc((100% - var(--guide-w)) / 2); }
+
+/* While the app starts, restored state (e.g. an open guide) appears in place
+   instead of sliding in. main.js removes .booting after the first frames. */
+.booting *, .booting *::before, .booting *::after { transition: none !important; }
+
+/* Windows "Show animations" off: no slides, no intro. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: 0s !important; transition-delay: 0s !important; }
+  #empty .cube path { stroke-dashoffset: 0; }
+}
 
 kbd {
   font-family: inherit; font-size: 11px;

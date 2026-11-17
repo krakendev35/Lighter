@@ -270,6 +270,11 @@ refreshButtons = setupTopbar(document.getElementById('topbar-buttons'), actions,
 refreshButtons();
 const resetPlayer = setupPlayer(document.getElementById('player'), viewer);
 setupAutoHide(['topbar', 'player'].map((id) => document.getElementById(id)));
+
+// Turn transitions on once the first frames are drawn (see .booting in theme.css).
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => document.documentElement.classList.remove('booting')),
+);
 setupShortcuts(actions);
 
 /* ---------------- Drag & drop ---------------- */

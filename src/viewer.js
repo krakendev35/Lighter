@@ -136,6 +136,7 @@ export class Viewer {
     fitAxes(this.axes, this.box);
     this.applyDisplay();
     this.frame();
+    this.reveal();
   }
 
   /* ---------------- View tools ---------------- */
@@ -168,7 +169,7 @@ export class Viewer {
    * Slide the orbit point and the camera to new positions over ~300 ms
    * (Center and Fit). Both move together, so the view never swings.
    */
-  glideTo(toTarget, toPosition, { near, far } = {}) {
+  glideTo(toTarget, toPosition, { near, far, duration = SNAP_MS, easeOut = false } = {}) {
     this.snap = null;
     // While moving, keep the clipping range wide enough for both ends of the
     // glide; the final values are set when it lands.
@@ -184,14 +185,18 @@ export class Viewer {
       toPosition,
       near,
       far,
+      duration,
+      easeOut,
       start: performance.now(),
     };
   }
 
   stepGlide(now) {
     const g = this.glide;
-    const t = Math.min(1, (now - g.start) / SNAP_MS);
-    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const t = Math.min(1, (now - g.start) / g.duration);
+    const eased = g.easeOut
+      ? 1 - Math.pow(1 - t, 3) // fast start, soft landing (model reveal)
+      : t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     this.controls.target.lerpVectors(g.fromTarget, g.toTarget, eased);
     this.camera.position.lerpVectors(g.fromPosition, g.toPosition, eased);
     this.camera.lookAt(this.controls.target);
@@ -204,6 +209,26 @@ export class Viewer {
       this.glide = null;
       this.controls.update();
     }
+  }
+
+  /**
+   * Opening animation for a newly loaded model: the camera starts a bit
+   * farther out and turned slightly, then settles on the framed view.
+   * Skipped when Windows is set to reduce animations.
+   */
+  reveal() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const target = this.controls.target.clone();
+    const end = this.camera.position.clone();
+    const start = end
+      .clone()
+      .sub(target)
+      .multiplyScalar(1.3)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(-14))
+      .add(target);
+    this.camera.position.copy(start);
+    this.camera.lookAt(target);
+    this.glideTo(target, end, { duration: 700, easeOut: true });
   }
 
   /**

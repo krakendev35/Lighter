@@ -100,8 +100,12 @@ export function setupGuide(root, { onCustomize, onChange }) {
     closeBtn.setAttribute('aria-label', title);
   }
 
+  // The panel stays in the page and slides (theme.css); `inert` keeps the
+  // closed one out of reach of the mouse, Tab and screen readers.
+  const isOpen = () => document.body.classList.contains('guide-open');
+
   function setOpen(open, notify = true) {
-    root.hidden = !open;
+    root.inert = !open;
     document.body.classList.toggle('guide-open', open);
     try {
       localStorage.setItem(STORAGE_KEY, open ? 'open' : 'closed');
@@ -125,7 +129,7 @@ export function setupGuide(root, { onCustomize, onChange }) {
   setOpen(startOpen, false); // restoring at start-up: the toolbar reads isOpen() itself
 
   return {
-    toggle: () => setOpen(root.hidden),
-    isOpen: () => !root.hidden,
+    toggle: () => setOpen(!isOpen()),
+    isOpen,
   };
 }
