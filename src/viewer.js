@@ -10,6 +10,8 @@ export class Viewer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
+    // Neutral tone mapping keeps light grays from blowing out to flat white.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -24,9 +26,13 @@ export class Viewer {
     // Neutral white studio lighting (no tinted lights).
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    const key = new THREE.DirectionalLight(0xffffff, 1.5);
-    key.position.set(5, 10, 7);
-    this.scene.add(key);
+    this.scene.environmentIntensity = 0.6;
+    // Key light follows the camera so the side you're looking at is always lit.
+    this.keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    this.keyLight.position.set(1, 2, 1.5);
+    this.keyLight.target.position.set(0, 0, -1);
+    this.camera.add(this.keyLight, this.keyLight.target);
+    this.scene.add(this.camera);
 
     this.model = null;
 

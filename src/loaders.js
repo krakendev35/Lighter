@@ -5,10 +5,13 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // Neutral matte gray for files without colour info (plan: #bfbfbf).
+// DoubleSide: many STL/OBJ files have faces wound the wrong way, and a viewer
+// should never make parts of a model disappear because of that.
 export const NEUTRAL_MATERIAL = new THREE.MeshStandardMaterial({
   color: 0xbfbfbf,
   roughness: 0.8,
   metalness: 0,
+  side: THREE.DoubleSide,
 });
 
 export const SUPPORTED = ['stl', 'obj', 'gltf', 'glb'];
@@ -31,7 +34,7 @@ export async function loadModel(buffer, name) {
       const geometry = new STLLoader().parse(buffer);
       geometry.computeVertexNormals();
       const material = geometry.hasColors
-        ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })
+        ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide })
         : NEUTRAL_MATERIAL;
       return { object: new THREE.Mesh(geometry, material), animations: [] };
     }
