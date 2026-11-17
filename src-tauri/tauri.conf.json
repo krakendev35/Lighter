@@ -29,6 +29,15 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "fileAssociations": [
+      { "ext": ["stl"], "name": "STL model", "description": "STL 3D model", "role": "Viewer" },
+      { "ext": ["obj"], "name": "OBJ model", "description": "Wavefront OBJ 3D model", "role": "Viewer" },
+      { "ext": ["gltf"], "name": "glTF model", "description": "glTF 3D model", "role": "Viewer" },
+      { "ext": ["glb"], "name": "GLB model", "description": "glTF binary 3D model", "role": "Viewer" },
+      { "ext": ["fbx"], "name": "FBX model", "description": "FBX 3D model", "role": "Viewer" },
+      { "ext": ["ply"], "name": "PLY model", "description": "PLY 3D model", "role": "Viewer" },
+      { "ext": ["3mf"], "name": "3MF model", "description": "3D Manufacturing Format model", "role": "Viewer" }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
