@@ -45,7 +45,9 @@ html, body {
   user-select: none;
 }
 
-#viewport { position: fixed; inset: 0; transition: right var(--slide); }
+/* Always the full window; when the guide opens, the camera's framing shifts
+   instead (Viewer.setRightInset), so the canvas is never resized mid-slide. */
+#viewport { position: fixed; inset: 0; }
 #viewport canvas { display: block; }
 
 /* ---------- Auto-hiding controls ---------- */
@@ -162,18 +164,18 @@ body.has-model #empty { display: none; }
    2. while it finishes, each line of text fades up out of a soft blur,
       one after another,
    3. the two quiet hint lines come last, separately. */
-#empty > * { animation: fade-up 800ms var(--ease-out) both; }
+#empty > * { animation: fade-up 480ms var(--ease-out) both; }
 #empty > .cube { animation: fade-in 300ms ease both; }
-#empty > :nth-child(2) { animation-delay: 380ms; }  /* Drop a 3D file here */
-#empty > :nth-child(3) { animation-delay: 500ms; }  /* or press Ctrl + O */
-#empty > :nth-child(4) { animation-delay: 600ms; }  /* Open file */
-#empty > :nth-child(5) { animation-delay: 700ms; }  /* formats */
+#empty > :nth-child(2) { animation-delay: 300ms; }  /* Drop a 3D file here */
+#empty > :nth-child(3) { animation-delay: 380ms; }  /* or press Ctrl + O */
+#empty > :nth-child(4) { animation-delay: 450ms; }  /* Open file */
+#empty > :nth-child(5) { animation-delay: 520ms; }  /* formats */
 #empty > #start-hint { animation: none; }
-#start-hint p { animation: fade-up 900ms var(--ease-out) both; }
-#start-hint p:nth-child(1) { animation-delay: 880ms; }
-#start-hint p:nth-child(2) { animation-delay: 1020ms; }
+#start-hint p { animation: fade-up 520ms var(--ease-out) both; }
+#start-hint p:nth-child(1) { animation-delay: 620ms; }
+#start-hint p:nth-child(2) { animation-delay: 700ms; }
 #empty .cube path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 900ms var(--ease-out) 80ms forwards; }
-@keyframes fade-up { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 #empty .cube { color: var(--text); margin-bottom: 8px; }
@@ -250,7 +252,6 @@ body.has-animation #guide .anim-only { display: block; }
   --slide-ms: 260ms;
   --slide: var(--slide-ms) var(--ease-out);
 }
-body.guide-open #viewport,
 body.guide-open #topbar,
 body.guide-open #empty { right: var(--guide-w); }
 body.guide-open #viewcube { right: calc(var(--guide-w) + 16px); }

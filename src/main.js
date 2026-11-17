@@ -14,10 +14,18 @@ const viewCube = new ViewCube(viewer, document.body);
 const fileInput = document.getElementById('file-input');
 const keybindEditor = setupKeybindEditor(document.getElementById('keybinds'));
 setupStartHint(document.getElementById('start-hint'));
+// Panel width from theme.css, so the 3D view's shift always matches it.
+const guideWidth = () =>
+  parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--guide-w')) || 300;
 const guide = setupGuide(document.getElementById('guide'), {
   onCustomize: () => keybindEditor.open(),
-  onChange: () => refreshButtons(), // the ? button shows pressed while open
+  onChange: (open) => {
+    viewer.setRightInset(open ? guideWidth() : 0); // slides with the panel
+    refreshButtons(); // the ? button shows pressed while open
+  },
 });
+// Guide left open last time: start with the view already shifted, no slide.
+viewer.setRightInset(guide.isOpen() ? guideWidth() : 0, { animate: false });
 
 /* ---------------- Opening files ---------------- */
 

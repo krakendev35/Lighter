@@ -27,6 +27,7 @@ export const THEMES = {
 const ISO_DIRECTION = new THREE.Vector3(1, 0.8, 1).normalize();
 const SNAP_MS = 300;
 const POLE_EPS = 1e-4; // radians away from straight up/down
+const INSET_MS = 260; // matches --slide-ms in theme.css (guide panel slide)
 
 export class Viewer {
   constructor(container) {
@@ -84,14 +85,20 @@ export class Viewer {
     this.player = null; // AnimationPlayer when the model has animations
     this.lastFrame = performance.now();
 
-    // Follow the container's size, not just the window's: it also shrinks
-    // when the guide panel opens.
+    // Width covered on the right (the guide panel). The canvas keeps its full
+    // size underneath; only the camera's framing shifts so the model centres
+    // in the part that's still visible. Resizing the canvas instead would
+    // reallocate its whole drawing surface on every frame of the slide.
+    this.rightInset = 0;
+    this.insetAnim = null;
+
     new ResizeObserver(() => this.onResize()).observe(container);
     this.renderer.setAnimationLoop((now) => {
       // Cap the step so switching back to the window doesn't jump the animation.
       const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
       this.lastFrame = now;
       this.player?.update(dt);
+      if (this.insetAnim) this.stepInset(now);
       if (this.snap) this.stepSnap(now);
       else if (this.glide) this.stepGlide(now);
       else this.controls.update();
@@ -109,11 +116,44 @@ export class Viewer {
     const { clientWidth: w, clientHeight: h } = this.container;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.applyViewOffset();
     this.renderer.setSize(w, h);
     // Resizing wipes the canvas, and this runs after the frame's normal draw
     // but before it reaches the screen. Draw again right away, or the model
-    // vanishes for as long as the size keeps changing (e.g. the guide sliding).
+    // blinks out while the window is being resized.
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Keep `px` on the right free (guide panel open): the model centres in the
+   * remaining width. Animated over the panel's slide unless `animate` is false
+   * or Windows is set to reduce animations.
+   */
+  setRightInset(px, { animate = true } = {}) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!animate || reduce) {
+      this.insetAnim = null;
+      this.rightInset = px;
+      this.applyViewOffset();
+      return;
+    }
+    this.insetAnim = { from: this.rightInset, to: px, start: performance.now() };
+  }
+
+  stepInset(now) {
+    const a = this.insetAnim;
+    const t = Math.min(1, (now - a.start) / INSET_MS);
+    const eased = 1 - Math.pow(1 - t, 3); // same feel as the panel's CSS ease-out
+    this.rightInset = a.from + (a.to - a.from) * eased;
+    this.applyViewOffset();
+    if (t === 1) this.insetAnim = null;
+  }
+
+  /** Shift the picture left by half the inset (no resize, just the projection). */
+  applyViewOffset() {
+    const { clientWidth: w, clientHeight: h } = this.container;
+    if (this.rightInset > 0.5) this.camera.setViewOffset(w, h, this.rightInset / 2, 0, w, h);
+    else this.camera.clearViewOffset();
   }
 
   /* ---------------- Model ---------------- */
@@ -379,8 +419,12 @@ export class Viewer {
 
   /** The current view as a PNG (the 3D view only, no UI). */
   screenshot() {
+    // Without the guide's shift, so the model is centred in the image.
+    this.camera.clearViewOffset();
     this.renderer.render(this.scene, this.camera);
-    return new Promise((resolve) => this.renderer.domElement.toBlob(resolve, 'image/png'));
+    const blob = new Promise((resolve) => this.renderer.domElement.toBlob(resolve, 'image/png'));
+    this.applyViewOffset(); // the next frame is drawn shifted again
+    return blob;
   }
 
   /* ---------------- Info ---------------- */
