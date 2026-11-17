@@ -84,7 +84,9 @@ export class Viewer {
     this.player = null; // AnimationPlayer when the model has animations
     this.lastFrame = performance.now();
 
-    window.addEventListener('resize', () => this.onResize());
+    // Follow the container's size, not just the window's: it also shrinks
+    // when the guide panel opens.
+    new ResizeObserver(() => this.onResize()).observe(container);
     this.renderer.setAnimationLoop((now) => {
       // Cap the step so switching back to the window doesn't jump the animation.
       const dt = Math.min((now - this.lastFrame) / 1000, 0.1);

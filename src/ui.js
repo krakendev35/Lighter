@@ -11,17 +11,6 @@ function withKey(id, label = keymap.label(id)) {
   return key ? `${label} (${key})` : label;
 }
 
-/** 8-tooth gear outline, centred in the 18px icon box. */
-function gearIcon() {
-  const pts = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    for (const [da, r] of [[-0.3, 5.4], [-0.17, 7.3], [0.17, 7.3], [0.3, 5.4]]) {
-      pts.push(`${(9 + r * Math.cos(a + da)).toFixed(2)} ${(9 + r * Math.sin(a + da)).toFixed(2)}`);
-    }
-  }
-  return `<path d="M${pts.join('L')}Z"/><circle cx="9" cy="9" r="2.3"/>`;
-}
 
 // Thin-line 18px icons, 1.5px stroke (see theme.css for stroke settings).
 const ICONS = {
@@ -42,7 +31,8 @@ const ICONS = {
   screenshot:
     '<rect x="2.5" y="5" width="13" height="9.5" rx="1"/><circle cx="9" cy="9.75" r="2.5"/><path d="M6.5 5l1-2h3l1 2"/>',
   theme: '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
-  keybinds: gearIcon(),
+  guide:
+    '<circle cx="9" cy="9" r="6.75"/><path d="M7.1 7.1a1.9 1.9 0 1 1 2.65 1.75c-.45.2-.75.6-.75 1.1v.4"/><circle cx="9" cy="12.6" r=".2" fill="currentColor"/>',
   play: '<path d="M6 4v10l8-5z" fill="currentColor"/>',
   pause: '<path d="M6.5 4.5v9M11.5 4.5v9"/>',
 };
@@ -69,7 +59,7 @@ const BUTTONS = [
   '|',
   { id: 'screenshot', extra: 'PNG' },
   { id: 'theme' },
-  { id: 'keybinds', extra: 'change keys' },
+  { id: 'guide', extra: 'mouse controls and every shortcut' },
 ];
 
 /**
@@ -222,38 +212,16 @@ export function setupAutoHide(panels) {
 }
 
 /**
- * Quick guide on the start screen: mouse controls and the most useful keys.
- * Keys come from the keymap, so the guide shows the user's own bindings.
+ * Start screen hint: one quiet line about the mouse, one about the guide.
+ * The guide's key comes from the keymap; the second line is left out when
+ * the guide has no key.
  */
-export function setupManual(container) {
-  const chips = (...ids) => {
-    const keys = ids.map((id) => displayKey(keymap.get(id))).filter(Boolean);
-    return keys.length ? keys.map((k) => `<kbd>${escapeHtml(k)}</kbd>`).join(' ') : '<span class="none">—</span>';
-  };
-  const row = (keys, text) => `<div class="m-keys">${keys}</div><div>${text}</div>`;
-
+export function setupStartHint(container) {
   function render() {
+    const key = displayKey(keymap.get('guide'));
     container.innerHTML = `
-      <div class="m-col">
-        <h3>Mouse</h3>
-        <div class="m-grid">
-          ${row('<kbd>Left-drag</kbd>', 'Rotate (or the selected tool)')}
-          ${row('<kbd>Right-drag</kbd>', 'Pan')}
-          ${row('<kbd>Wheel</kbd>', 'Zoom')}
-          ${row('<kbd>View cube</kbd>', 'Click a side to look from it')}
-        </div>
-      </div>
-      <div class="m-col">
-        <h3>Keys</h3>
-        <div class="m-grid">
-          ${row(chips('rotate', 'pan', 'zoom'), 'Rotate / pan / zoom tool')}
-          ${row(chips('center'), 'Center model')}
-          ${row(chips('fit'), 'Fit to view')}
-          ${row(chips('wireframe', 'edges', 'clay'), 'Wireframe / edges / clay')}
-          ${row(chips('previousFile', 'nextFile'), 'Previous / next file')}
-          ${row(chips('keybinds'), 'All shortcuts · change keys')}
-        </div>
-      </div>`;
+      <p>Drag to rotate<span class="dot"></span>Right-drag to pan<span class="dot"></span>Scroll to zoom</p>
+      ${key ? `<p>Press <kbd>${escapeHtml(key)}</kbd> any time to see every shortcut</p>` : ''}`;
   }
   render();
   keymap.onChange(render);

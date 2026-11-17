@@ -42,7 +42,10 @@ export const ACTION_GROUPS = [
   },
   {
     name: 'App',
-    actions: [{ id: 'keybinds', label: 'Keyboard shortcuts', key: '?' }],
+    actions: [
+      { id: 'guide', label: 'Show / hide guide', key: '?' },
+      { id: 'keybinds', label: 'Customize keys', key: null },
+    ],
   },
 ];
 

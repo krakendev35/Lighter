@@ -2,8 +2,9 @@
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
-import { setupTopbar, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts, setupManual } from './ui.js';
+import { setupTopbar, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts, setupStartHint } from './ui.js';
 import { setupKeybindEditor } from './keybinds.js';
+import { setupGuide } from './guide.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
@@ -12,7 +13,11 @@ const viewCube = new ViewCube(viewer, document.body);
 
 const fileInput = document.getElementById('file-input');
 const keybindEditor = setupKeybindEditor(document.getElementById('keybinds'));
-setupManual(document.getElementById('manual'));
+setupStartHint(document.getElementById('start-hint'));
+const guide = setupGuide(document.getElementById('guide'), {
+  onCustomize: () => keybindEditor.open(),
+  onChange: () => refreshButtons(), // the ? button shows pressed while open
+});
 
 /* ---------------- Opening files ---------------- */
 
@@ -241,6 +246,7 @@ const actions = {
   zoom: withRefresh(() => setTool('zoom')),
   screenshot: () => saveScreenshot().catch((err) => console.error('Screenshot failed:', err)),
   playPause: () => viewer.player?.toggle(),
+  guide: () => guide.toggle(),
   keybinds: () => keybindEditor.open(),
   previousFile: () => stepFile(-1).catch(console.error),
   nextFile: () => stepFile(1).catch(console.error),
@@ -248,6 +254,7 @@ const actions = {
 
 const isActive = (id) =>
   ({
+    guide: guide.isOpen(),
     rotate: viewer.tool === 'rotate',
     pan: viewer.tool === 'pan',
     zoom: viewer.tool === 'zoom',

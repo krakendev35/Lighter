@@ -20,7 +20,10 @@
 
     <div id="player"></div>
 
-    <!-- Keybind editor (keybinds.js), opened from the gear button or ? -->
+    <!-- Guide side panel (guide.js), toggled with ? or the top-bar button -->
+    <aside id="guide" aria-label="Guide" hidden></aside>
+
+    <!-- Keybind editor (keybinds.js), opened from the guide's "Customize keys" -->
     <div id="keybinds" hidden></div>
 
     <!-- Empty state -->
@@ -33,8 +36,8 @@
       <p>or press <kbd>Ctrl</kbd> + <kbd>O</kbd></p>
       <button id="open-btn" class="outline-btn" type="button">Open file</button>
       <p class="formats">STL · OBJ · glTF · GLB · FBX · PLY · 3MF</p>
-      <!-- Quick guide for first-time users, filled from the keymap (ui.js) -->
-      <div id="manual"></div>
+      <!-- Quiet hint: mouse basics + the key that opens the guide (ui.js) -->
+      <div id="start-hint"></div>
     </section>
 
     <input id="file-input" type="file" multiple hidden />
