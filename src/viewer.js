@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { NEUTRAL_MATERIAL } from './loaders.js';
+import { AnimationPlayer } from './animation.js';
 import { createGrid, fitGrid, setGridColor, createAxes, fitAxes, setAxesColors } from './helpers.js';
 
 // Viewport colours per theme (UI colours live in theme.css).
@@ -78,8 +79,15 @@ export class Viewer {
     this.snap = null; // running camera animation (view cube)
     this.frameCallbacks = [];
 
+    this.player = null; // AnimationPlayer when the model has animations
+    this.lastFrame = performance.now();
+
     window.addEventListener('resize', () => this.onResize());
     this.renderer.setAnimationLoop((now) => {
+      // Cap the step so switching back to the window doesn't jump the animation.
+      const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
+      this.lastFrame = now;
+      this.player?.update(dt);
       if (this.snap) this.stepSnap(now);
       else this.controls.update();
       this.renderer.render(this.scene, this.camera);
@@ -102,12 +110,16 @@ export class Viewer {
   /* ---------------- Model ---------------- */
 
   /** Replace the current model with a new one and frame it. */
-  setModel(object) {
+  setModel(object, animations = []) {
+    this.player?.dispose();
+    this.player = null;
     if (this.model) {
       this.scene.remove(this.model);
       disposeObject(this.model);
     }
     this.model = object;
+    const player = new AnimationPlayer(object, animations);
+    if (player.hasClips) this.player = player;
     this.edges = null;
     object.traverse((o) => {
       if (o.isMesh) o.userData.lighterMaterial = o.material;
@@ -247,6 +259,14 @@ export class Viewer {
     setGridColor(this.grid, t.grid);
     await document.fonts.load("500 40px Poppins");
     setAxesColors(this.axes, t.axes);
+  }
+
+  /* ---------------- Screenshot ---------------- */
+
+  /** The current view as a PNG (the 3D view only, no UI). */
+  screenshot() {
+    this.renderer.render(this.scene, this.camera);
+    return new Promise((resolve) => this.renderer.domElement.toBlob(resolve, 'image/png'));
   }
 
   /* ---------------- Info ---------------- */
