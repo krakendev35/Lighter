@@ -1,7 +1,27 @@
 // Top bar, animation player, auto-hide and keyboard shortcuts.
-// Every shortcut is shown in its button's tooltip.
+// Every shortcut is shown in its button's tooltip, taken from the keymap so
+// it stays right after the user rebinds keys.
+import { keymap, keyFromEvent, displayKey } from './keymap.js';
 
 const HIDE_AFTER_MS = 2000;
+
+/** "Label (Key)" for tooltips; just "Label" when the action has no key. */
+function withKey(id, label = keymap.label(id)) {
+  const key = displayKey(keymap.get(id));
+  return key ? `${label} (${key})` : label;
+}
+
+/** 8-tooth gear outline, centred in the 18px icon box. */
+function gearIcon() {
+  const pts = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    for (const [da, r] of [[-0.3, 5.4], [-0.17, 7.3], [0.17, 7.3], [0.3, 5.4]]) {
+      pts.push(`${(9 + r * Math.cos(a + da)).toFixed(2)} ${(9 + r * Math.sin(a + da)).toFixed(2)}`);
+    }
+  }
+  return `<path d="M${pts.join('L')}Z"/><circle cx="9" cy="9" r="2.3"/>`;
+}
 
 // Thin-line 18px icons, 1.5px stroke (see theme.css for stroke settings).
 const ICONS = {
@@ -22,31 +42,34 @@ const ICONS = {
   screenshot:
     '<rect x="2.5" y="5" width="13" height="9.5" rx="1"/><circle cx="9" cy="9.75" r="2.5"/><path d="M6.5 5l1-2h3l1 2"/>',
   theme: '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
+  keybinds: gearIcon(),
   play: '<path d="M6 4v10l8-5z" fill="currentColor"/>',
   pause: '<path d="M6.5 4.5v9M11.5 4.5v9"/>',
 };
 
-// '|' = divider between button groups.
+// '|' = divider between button groups. Button ids are keymap action ids;
+// `extra` is appended to the tooltip after the label and key.
 const BUTTONS = [
-  { id: 'open', title: 'Open file (Ctrl+O) · ← → previous / next file in the folder' },
+  { id: 'open' },
   '|',
-  { id: 'rotate', title: 'Rotate tool (R) · left-drag rotates' },
-  { id: 'pan', title: 'Pan tool (P) · left-drag moves the view · right-drag pans with any tool' },
-  { id: 'zoom', title: 'Zoom tool (Z) · left-drag up/down zooms · wheel zooms with any tool' },
+  { id: 'rotate', extra: 'left-drag rotates' },
+  { id: 'pan', extra: 'left-drag moves the view · right-drag pans with any tool' },
+  { id: 'zoom', extra: 'left-drag up/down zooms · wheel zooms with any tool' },
   '|',
-  { id: 'center', title: 'Center model (H) · keeps zoom and angle' },
-  { id: 'fit', title: 'Fit to view (F) · center and zoom to fit' },
+  { id: 'center', extra: 'keeps zoom and angle' },
+  { id: 'fit', extra: 'center and zoom to fit' },
   '|',
-  { id: 'shaded', title: 'Shaded' },
-  { id: 'wireframe', title: 'Wireframe (W)' },
-  { id: 'edges', title: 'Shaded + edges (E)' },
-  { id: 'clay', title: 'Clay (C)' },
+  { id: 'shaded' },
+  { id: 'wireframe' },
+  { id: 'edges' },
+  { id: 'clay' },
   '|',
-  { id: 'grid', title: 'Grid (G)' },
-  { id: 'axes', title: 'Axes' },
+  { id: 'grid' },
+  { id: 'axes' },
   '|',
-  { id: 'screenshot', title: 'Save screenshot (PNG)' },
-  { id: 'theme', title: 'Light / dark theme' },
+  { id: 'screenshot', extra: 'PNG' },
+  { id: 'theme' },
+  { id: 'keybinds', extra: 'change keys' },
 ];
 
 /**
@@ -64,16 +87,24 @@ export function setupTopbar(container, actions, isActive) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'icon-btn';
-    el.title = b.title;
-    el.setAttribute('aria-label', b.title);
     el.innerHTML = `<svg viewBox="0 0 18 18" width="18" height="18">${ICONS[b.id]}</svg>`;
     el.addEventListener('click', () => actions[b.id]());
     container.appendChild(el);
-    buttons[b.id] = el;
+    buttons[b.id] = { el, extra: b.extra };
   }
 
+  function updateTitles() {
+    for (const [id, { el, extra }] of Object.entries(buttons)) {
+      const title = extra ? `${withKey(id)} · ${extra}` : withKey(id);
+      el.title = title;
+      el.setAttribute('aria-label', title);
+    }
+  }
+  updateTitles();
+  keymap.onChange(updateTitles);
+
   return function refresh() {
-    for (const [id, el] of Object.entries(buttons)) {
+    for (const [id, { el }] of Object.entries(buttons)) {
       el.classList.toggle('active', isActive(id));
     }
   };
@@ -86,7 +117,7 @@ export function setupTopbar(container, actions, isActive) {
  */
 export function setupPlayer(container, viewer) {
   container.innerHTML = `
-    <button type="button" class="icon-btn" id="play-btn" aria-label="Play / pause (Space)" title="Play / pause (Space)"></button>
+    <button type="button" class="icon-btn" id="play-btn"></button>
     <input type="range" id="timeline" min="0" max="1" step="0.001" value="0" aria-label="Timeline" />
     <span id="anim-time"></span>
     <select id="clip-select" aria-label="Animation"></select>`;
@@ -96,6 +127,13 @@ export function setupPlayer(container, viewer) {
   const select = container.querySelector('#clip-select');
   let dragging = false;
   let shownPlaying = null;
+
+  const updatePlayTitle = () => {
+    playBtn.title = withKey('playPause');
+    playBtn.setAttribute('aria-label', playBtn.title);
+  };
+  updatePlayTitle();
+  keymap.onChange(updatePlayTitle);
 
   const fmt = (t) => {
     const m = Math.floor(t / 60);
@@ -199,35 +237,22 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-/** Global keyboard shortcuts. `actions` is the same map the top bar uses. */
+/**
+ * Global keyboard shortcuts, looked up in the keymap. `actions` is the same
+ * map the top bar uses (keymap action id → function).
+ */
 export function setupShortcuts(actions) {
   window.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key.toLowerCase() === 'o') {
-      e.preventDefault();
-      actions.open();
-      return;
-    }
-    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
-    // The clip picker keeps all its keys; the timeline slider keeps its arrow
-    // keys (frame stepping) but Space always means play/pause.
+    if (e.repeat) return;
+    // The clip picker keeps all its keys; the timeline slider keeps the keys
+    // it uses for stepping (arrows, Home/End, Page Up/Down).
     if (e.target.closest?.('select')) return;
-    if (e.target.type === 'range' && e.key !== ' ') return;
-    const key = {
-      w: 'toggleWireframe',
-      e: 'toggleEdges',
-      c: 'clay',
-      g: 'grid',
-      f: 'fit',
-      h: 'center',
-      r: 'rotate',
-      p: 'pan',
-      z: 'zoom',
-      ' ': 'playPause',
-      arrowleft: 'previousFile',
-      arrowright: 'nextFile',
-    }[e.key.toLowerCase()];
-    if (!key) return;
-    e.preventDefault(); // Space would otherwise "click" the last focused button
-    actions[key]();
+    if (e.target.type === 'range' && /^(Arrow|Home$|End$|Page)/.test(e.key)) return;
+
+    const key = keyFromEvent(e);
+    const id = key && keymap.actionFor(key);
+    if (!id || !actions[id]) return;
+    e.preventDefault(); // e.g. Space would otherwise "click" the last focused button
+    actions[id]();
   });
 }

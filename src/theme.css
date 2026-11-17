@@ -182,3 +182,61 @@ kbd {
   pointer-events: auto;
 }
 .outline-btn:hover { background: var(--hover); }
+.outline-btn:disabled { opacity: 0.4; cursor: default; background: transparent; }
+
+/* ---------- Keybind editor ---------- */
+#keybinds:not([hidden]) {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+.kb-panel {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+.kb-panel header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.kb-panel h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.kb-list { overflow-y: auto; padding: 4px 16px 12px; }
+.kb-list::-webkit-scrollbar { width: 8px; }
+.kb-list::-webkit-scrollbar-track { background: transparent; }
+.kb-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.kb-list::-webkit-scrollbar-button { display: none; }
+.kb-panel h3 {
+  margin: 12px 0 4px;
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.kb-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.kb-key {
+  min-width: 64px;
+  font: inherit; font-size: 11px; font-weight: 500;
+  padding: 3px 8px;
+  color: var(--text);
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.kb-key:hover { border-color: var(--text-2); }
+.kb-key.unset { color: var(--text-2); }
+.kb-key.active { background: var(--active-bg); color: var(--active-fg); border-color: var(--active-bg); }
+.kb-key:focus { outline: none; }
+.kb-key:focus-visible { outline: 1px solid var(--text-2); outline-offset: 1px; }
+.kb-panel footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+}
+.kb-panel footer .outline-btn { margin-top: 0; flex-shrink: 0; }

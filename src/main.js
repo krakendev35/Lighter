@@ -3,6 +3,7 @@ import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
 import { setupTopbar, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
+import { setupKeybindEditor } from './keybinds.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
@@ -10,6 +11,7 @@ const viewer = new Viewer(document.getElementById('viewport'));
 const viewCube = new ViewCube(viewer, document.body);
 
 const fileInput = document.getElementById('file-input');
+const keybindEditor = setupKeybindEditor(document.getElementById('keybinds'));
 
 /* ---------------- Opening files ---------------- */
 
@@ -224,10 +226,9 @@ const withRefresh = (fn) => () => {
 const actions = {
   open: pickFile,
   shaded: withRefresh(() => viewer.setMode('shaded')),
-  wireframe: withRefresh(() => viewer.setMode('wireframe')),
-  edges: withRefresh(() => viewer.setMode('edges')),
-  toggleWireframe: withRefresh(() => toggleMode('wireframe')),
-  toggleEdges: withRefresh(() => toggleMode('edges')),
+  // Button and key both toggle: a second press goes back to shaded.
+  wireframe: withRefresh(() => toggleMode('wireframe')),
+  edges: withRefresh(() => toggleMode('edges')),
   clay: withRefresh(() => viewer.toggleClay()),
   grid: withRefresh(() => viewer.toggleGrid()),
   axes: withRefresh(() => viewer.toggleAxes()),
@@ -239,6 +240,7 @@ const actions = {
   zoom: withRefresh(() => setTool('zoom')),
   screenshot: () => saveScreenshot().catch((err) => console.error('Screenshot failed:', err)),
   playPause: () => viewer.player?.toggle(),
+  keybinds: () => keybindEditor.open(),
   previousFile: () => stepFile(-1).catch(console.error),
   nextFile: () => stepFile(1).catch(console.error),
 };
