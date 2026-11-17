@@ -1,7 +1,7 @@
 // App start and file-open handling.
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
-import { loadModel, extensionOf, SUPPORTED } from './loaders.js';
+import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
 import { setupTopbar, setupHints, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
@@ -13,15 +13,18 @@ const fileInput = document.getElementById('file-input');
 
 /* ---------------- Opening files ---------------- */
 
-/** Show a model from raw bytes + its file name. */
-async function showModel(buffer, name) {
+/**
+ * Show a model from raw bytes + its file name.
+ * `resolve` finds the textures / .mtl / .bin files the model refers to.
+ */
+async function showModel(buffer, name, resolve = null) {
   const format = extensionOf(name);
   if (!SUPPORTED.includes(format)) {
     console.warn(`Unsupported file: ${name}`);
     return;
   }
   try {
-    const { object } = await loadModel(buffer, name);
+    const { object } = await loadModel(buffer, name, resolve);
     viewer.setModel(object);
     document.body.classList.add('has-model');
     setFileInfo(name, viewer.stats(), { format, bytes: buffer.byteLength });
@@ -31,20 +34,51 @@ async function showModel(buffer, name) {
   }
 }
 
-/** Open a browser File object (file picker, or drop when running in a plain browser). */
-async function openFile(file) {
-  showModel(await file.arrayBuffer(), file.name);
+const isModel = (name) => SUPPORTED.includes(extensionOf(name));
+
+/**
+ * Open browser File objects (plain-browser drop / file picker). The first
+ * model is shown; the other files (textures, .mtl, .bin) are available to it.
+ */
+let blobUrls = [];
+async function openFiles(files) {
+  const model = files.find((f) => isModel(f.name));
+  if (!model) return;
+
+  blobUrls.forEach((u) => URL.revokeObjectURL(u));
+  blobUrls = [];
+  const byName = new Map(files.map((f) => [f.name, f]));
+  const resolve = makeResolver([...byName.keys()], (name) => {
+    const url = URL.createObjectURL(byName.get(name));
+    blobUrls.push(url);
+    return url;
+  });
+  showModel(await model.arrayBuffer(), model.name, resolve);
 }
 
 /** Open a file by its path on disk (desktop app only). */
 async function openPath(path) {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
+    const { invoke, convertFileSrc } = await import('@tauri-apps/api/core');
+    const dir = path.replace(/[\\/][^\\/]*$/, '');
+    let resolve = null;
+    try {
+      const files = await invoke('index_folder', { modelPath: path });
+      resolve = makeResolver(files, (rel) => convertFileSrc(`${dir}\\${rel.replace(/\//g, '\\')}`));
+    } catch (err) {
+      console.warn('Textures next to the model are unavailable:', err);
+    }
     const buffer = await invoke('read_file', { path });
-    showModel(buffer, path.split(/[\\/]/).pop());
+    showModel(buffer, path.split(/[\\/]/).pop(), resolve);
   } catch (err) {
     console.error(err);
   }
+}
+
+/** Several paths dropped at once: open the first model among them. */
+function openPaths(paths) {
+  const model = paths.find(isModel);
+  if (model) openPath(model);
 }
 
 async function setWindowTitle(title) {
@@ -56,11 +90,22 @@ async function setWindowTitle(title) {
   }
 }
 
-// Ctrl+O / "Open file" button. (A native dialog via tauri-plugin-dialog can replace this later.)
-const pickFile = () => fileInput.click();
+// Ctrl+O / "Open file" button. The desktop app uses the native Windows
+// dialog (it gives a real path, so textures next to the model can be found);
+// the plain browser uses a file input where the model and its textures can
+// be selected together.
+async function pickFile() {
+  if (!IN_TAURI) return fileInput.click();
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const path = await open({
+    multiple: false,
+    filters: [{ name: '3D models', extensions: SUPPORTED }],
+  });
+  if (path) openPath(path);
+}
 document.getElementById('open-btn').addEventListener('click', pickFile);
 fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) openFile(fileInput.files[0]);
+  openFiles([...fileInput.files]);
   fileInput.value = '';
 });
 
@@ -144,7 +189,7 @@ if (IN_TAURI) {
     else if (payload.type === 'leave') setDragging(false);
     else if (payload.type === 'drop') {
       setDragging(false);
-      if (payload.paths.length) openPath(payload.paths[0]);
+      openPaths(payload.paths);
     }
   });
 } else {
@@ -157,8 +202,7 @@ if (IN_TAURI) {
   window.addEventListener('drop', (e) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) openFile(file);
+    openFiles([...e.dataTransfer.files]);
   });
 }
 
