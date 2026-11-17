@@ -221,6 +221,44 @@ export function setupAutoHide(panels) {
   });
 }
 
+/**
+ * Quick guide on the start screen: mouse controls and the most useful keys.
+ * Keys come from the keymap, so the guide shows the user's own bindings.
+ */
+export function setupManual(container) {
+  const chips = (...ids) => {
+    const keys = ids.map((id) => displayKey(keymap.get(id))).filter(Boolean);
+    return keys.length ? keys.map((k) => `<kbd>${escapeHtml(k)}</kbd>`).join(' ') : '<span class="none">—</span>';
+  };
+  const row = (keys, text) => `<div class="m-keys">${keys}</div><div>${text}</div>`;
+
+  function render() {
+    container.innerHTML = `
+      <div class="m-col">
+        <h3>Mouse</h3>
+        <div class="m-grid">
+          ${row('<kbd>Left-drag</kbd>', 'Rotate (or the selected tool)')}
+          ${row('<kbd>Right-drag</kbd>', 'Pan')}
+          ${row('<kbd>Wheel</kbd>', 'Zoom')}
+          ${row('<kbd>View cube</kbd>', 'Click a side to look from it')}
+        </div>
+      </div>
+      <div class="m-col">
+        <h3>Keys</h3>
+        <div class="m-grid">
+          ${row(chips('rotate', 'pan', 'zoom'), 'Rotate / pan / zoom tool')}
+          ${row(chips('center'), 'Center model')}
+          ${row(chips('fit'), 'Fit to view')}
+          ${row(chips('wireframe', 'edges', 'clay'), 'Wireframe / edges / clay')}
+          ${row(chips('previousFile', 'nextFile'), 'Previous / next file')}
+          ${row(chips('keybinds'), 'All shortcuts · change keys')}
+        </div>
+      </div>`;
+  }
+  render();
+  keymap.onChange(render);
+}
+
 /** Write file name, short meta and the detail tooltip into the top bar. */
 export function setFileInfo(name, { triangles, vertices, size }, { format, bytes }) {
   const fmt = (n) => (n >= 100 ? Math.round(n) : n.toFixed(1));

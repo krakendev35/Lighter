@@ -158,32 +158,57 @@ export class Viewer {
    */
   centerModel() {
     if (!this.box || this.box.isEmpty()) return;
+    const delta = this.box.getCenter(new THREE.Vector3()).sub(this.controls.target);
+    this.glideTo(this.controls.target.clone().add(delta), this.camera.position.clone().add(delta));
+  }
+
+  /**
+   * Slide the orbit point and the camera to new positions over ~300 ms
+   * (Center and Fit). Both move together, so the view never swings.
+   */
+  glideTo(toTarget, toPosition, { near, far } = {}) {
     this.snap = null;
-    const center = this.box.getCenter(new THREE.Vector3());
+    // While moving, keep the clipping range wide enough for both ends of the
+    // glide; the final values are set when it lands.
+    if (near !== undefined) {
+      this.camera.near = Math.min(this.camera.near, near);
+      this.camera.far = Math.max(this.camera.far, far);
+      this.camera.updateProjectionMatrix();
+    }
     this.glide = {
       fromTarget: this.controls.target.clone(),
       fromPosition: this.camera.position.clone(),
-      delta: center.sub(this.controls.target),
+      toTarget,
+      toPosition,
+      near,
+      far,
       start: performance.now(),
     };
   }
 
   stepGlide(now) {
-    const { fromTarget, fromPosition, delta, start } = this.glide;
-    const t = Math.min(1, (now - start) / SNAP_MS);
+    const g = this.glide;
+    const t = Math.min(1, (now - g.start) / SNAP_MS);
     const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const offset = delta.clone().multiplyScalar(eased);
-    this.controls.target.copy(fromTarget).add(offset);
-    this.camera.position.copy(fromPosition).add(offset);
+    this.controls.target.lerpVectors(g.fromTarget, g.toTarget, eased);
+    this.camera.position.lerpVectors(g.fromPosition, g.toPosition, eased);
     this.camera.lookAt(this.controls.target);
     if (t === 1) {
+      if (g.near !== undefined) {
+        this.camera.near = g.near;
+        this.camera.far = g.far;
+        this.camera.updateProjectionMatrix();
+      }
       this.glide = null;
       this.controls.update();
     }
   }
 
-  /** Point the camera so the whole model fits in view. */
-  frame({ keepDirection = false } = {}) {
+  /**
+   * Point the camera so the whole model fits in view. `animate` glides there
+   * like Center (the F key / Fit button); a newly opened model is framed at once.
+   */
+  frame({ keepDirection = false, animate = false } = {}) {
     if (!this.box || this.box.isEmpty()) return;
     this.snap = null;
     this.glide = null;
@@ -195,11 +220,18 @@ export class Viewer {
     const direction = keepDirection
       ? this.camera.position.clone().sub(this.controls.target).normalize()
       : ISO_DIRECTION;
-    this.camera.position.copy(sphere.center).addScaledVector(direction, distance);
-    this.camera.near = distance / 100;
-    this.camera.far = distance * 100;
-    this.camera.updateProjectionMatrix();
+    const position = sphere.center.clone().addScaledVector(direction, distance);
+    const near = distance / 100;
+    const far = distance * 100;
 
+    if (animate) {
+      this.glideTo(sphere.center.clone(), position, { near, far });
+      return;
+    }
+    this.camera.position.copy(position);
+    this.camera.near = near;
+    this.camera.far = far;
+    this.camera.updateProjectionMatrix();
     this.controls.target.copy(sphere.center);
     this.controls.update();
   }

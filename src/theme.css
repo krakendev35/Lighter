@@ -161,6 +161,24 @@ body.has-model #empty { display: none; }
 #empty .formats { margin-top: 12px; font-size: 11px; }
 body.dragging #empty { color: var(--text); }
 
+/* Quick guide under the upload area */
+#manual {
+  display: flex; gap: 40px; flex-wrap: wrap; justify-content: center;
+  margin-top: 36px; padding-top: 24px;
+  border-top: 1px solid var(--border);
+  max-width: calc(100vw - 32px);
+  font-size: 12px;
+}
+#manual h3 {
+  margin: 0 0 10px;
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+#manual .m-grid { display: grid; grid-template-columns: auto auto; gap: 7px 14px; align-items: center; }
+#manual .m-keys { display: flex; gap: 4px; justify-content: flex-end; white-space: nowrap; }
+#manual .m-grid > div:nth-child(even) { color: var(--text); }
+#manual .none { color: var(--text-2); }
+
 kbd {
   font-family: inherit; font-size: 11px;
   padding: 1px 6px;

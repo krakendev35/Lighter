@@ -39,7 +39,7 @@ Mockups: Design canvas "3D Viewer — UI drafts" (https://claude.ai/artifact/PwE
 - Controls fade out again after ~2 s without mouse movement (and while orbiting); they stay visible while the cursor is over them.
 - **View cube** always visible, top-right (below the top bar when it's shown).
 - Info panel from earlier plan is folded into the top bar meta; full details (vertices, file size, format) can show on hover/click of the file name.
-- **Empty state** (board "Empty state"): centered thin cube icon, "Drop a 3D file here", "or press Ctrl + O", outlined "Open file" button, supported formats line.
+- **Empty state** (board "Empty state"): centered thin cube icon, "Drop a 3D file here", "or press Ctrl + O", outlined "Open file" button, supported formats line, and below it a **quick guide** for first-time users (Mouse: left/right-drag, wheel, view cube · Keys: tools, Center, Fit, display modes, prev/next, ? for all shortcuts). The guide shows the user's current keybinds.
 
 ## Look & feel (decided)
 Monochrome black & white. **Dark theme is the default**; light theme is a toggle (exact inverse).
