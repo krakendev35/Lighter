@@ -33,14 +33,14 @@ Mockups: Design canvas "3D Viewer — UI drafts" (https://claude.ai/artifact/PwE
 - Moving the mouse reveals:
   - **Top bar** (48px, full width): left = file name (semibold) + secondary meta (triangle count · dimensions); right = icon buttons: Open | Rotate, Pan, Zoom | Center, Fit | Shaded, Wireframe, Shaded+edges, Clay | Grid, Axes | Screenshot, Theme.
   - **Animation player** (bottom-center, animated models only): play/pause, timeline, time, clip picker.
-- **No keyboard-hint strip** (removed: it cluttered the screen together with the player). Each shortcut is shown in its button's tooltip. Defaults: R Rotate · P Pan · Z Zoom · C Center · F Fit · W Wireframe · E Edges · Shift+C Clay · G Grid · Space Play/pause · ← → Prev/next file · Ctrl+O Open · ? Guide.
+- **No keyboard-hint strip** (removed: it cluttered the screen together with the player). Each shortcut is shown in its button's tooltip. Defaults: R Rotate · P Pan · Z Zoom · C Center · F Fit · W Wireframe · E Edges · Shift+C Clay · G Grid · Space Play/pause · ← → Prev/next file · Ctrl+O Open · H Guide (help; "?" needs Shift and moves between keyboard layouts).
 - **Keybinds are customisable:** "Customize keys" in the guide panel opens the keybind editor; click a key and press the new one (Esc cancels, Backspace clears). A key already in use swaps with the old one. Saved per user (localStorage); "Reset to defaults" restores them.
 - **View tools:** the selected tool decides what left-drag does (rotate / pan / zoom); right-drag always pans and the wheel always zooms. **Center (C)** slides the model back to the middle keeping zoom and angle; **Fit (F)** centres and zooms to fit.
 - Controls fade out again after ~2 s without mouse movement (and while orbiting); they stay visible while the cursor is over them.
 - **View cube** always visible, top-right (below the top bar when it's shown).
 - Info panel from earlier plan is folded into the top bar meta; full details (vertices, file size, format) can show on hover/click of the file name.
-- **Empty state** (board "Empty state"): centered thin cube icon, "Drop a 3D file here", "or press Ctrl + O", outlined "Open file" button, supported formats line, and below it a **quiet hint** (board "Start · A — One quiet line"): "Drag to rotate · Right-drag to pan · Scroll to zoom" and "Press ? any time to see every shortcut".
-- **Guide side panel** (board "In-app · A — Toggleable side panel"): ? key or the ? button at the end of the top bar toggles a 300 px panel on the right listing mouse controls and every shortcut, grouped (Mouse, View, Display, Animation for animated models, Files), built from the keymap. Footer: "Customize keys" opens the keybind editor. The 3D view, top bar, view cube and player make room for it; it stays until toggled and its open/closed state is remembered.
+- **Empty state** (board "Empty state"): centered thin cube icon, "Drop a 3D file here", "or press Ctrl + O", outlined "Open file" button, supported formats line, and below it a **quiet hint** (board "Start · A — One quiet line"): "Drag to rotate · Right-drag to pan · Scroll to zoom" and "Press H any time to see every shortcut" (the key shown follows the keymap).
+- **Guide side panel** (board "In-app · A — Toggleable side panel"): H key or the ? (help) button at the end of the top bar toggles a 300 px panel on the right listing mouse controls and every shortcut, grouped (Mouse, View, Display, Animation for animated models, Files), built from the keymap. Footer: "Customize keys" opens the keybind editor. The 3D view, top bar, view cube and player make room for it; it stays until toggled and its open/closed state is remembered.
 
 ## Look & feel (decided)
 Monochrome black & white. **Dark theme is the default**; light theme is a toggle (exact inverse).
@@ -56,7 +56,7 @@ Monochrome black & white. **Dark theme is the default**; light theme is a toggle
 | Active / toggled button | white background, black icon (inverted) |
 | Keyboard key chips | `#1c1c1c` with `#2a2a2a` border |
 | Grid | `#262626`, fading out with distance |
-| Axes | grayscale lines with small X / Y / Z labels (no RGB) |
+| Axes | grayscale "infinite" lines through the origin, fading out at both ends like the grid (positive side brighter); small X / Y / Z labels just outside the model (no RGB) |
 | Edge overlay (shaded + edges) | `#ffffff` at ~35% opacity |
 | Wireframe | `#e6e6e6` |
 | Title bar | `#0a0a0a` |

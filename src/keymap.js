@@ -43,7 +43,9 @@ export const ACTION_GROUPS = [
   {
     name: 'App',
     actions: [
-      { id: 'guide', label: 'Show / hide guide', key: '?' },
+      // H (help): a plain letter on every keyboard layout; "?" needs Shift
+      // and sits on different keys depending on the layout.
+      { id: 'guide', label: 'Show / hide guide', key: 'H' },
       { id: 'keybinds', label: 'Customize keys', key: null },
     ],
   },
