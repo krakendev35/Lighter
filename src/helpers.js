@@ -85,13 +85,36 @@ const AXES = [
   { dir: new THREE.Vector3(0, 0, 1), label: 'Z' },
 ];
 
+// Points along each axis line, as a fraction of its half-length (-1 … +1),
+// with their opacity. The line runs through the origin and fades out at both
+// ends like the grid; the positive side is brighter so you can tell + from −.
+// The origin appears twice so the brightness can jump there.
+const AXIS_STOPS = [
+  { t: -1, alpha: 0 },
+  { t: -0.4, alpha: 0.3 },
+  { t: 0, alpha: 0.45 },
+  { t: 0, alpha: 1 },
+  { t: 0.4, alpha: 0.85 },
+  { t: 1, alpha: 0 },
+];
+
+/**
+ * Three "infinite" axis lines through the world origin with X / Y / Z labels.
+ * The lines reach far past the model, so they never end inside it; each label
+ * sits just outside the model on the positive side of its axis.
+ */
 export function createAxes() {
   const group = new THREE.Group();
-  group.userData.parts = AXES.map(({ dir, label }) => {
+  group.userData.parts = AXES.map(({ label }) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(AXIS_STOPS.length * 3, 3));
+    // White with per-point opacity; the theme colour comes from the material.
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(AXIS_STOPS.flatMap((s) => [1, 1, 1, s.alpha]), 4));
     const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), dir]),
-      new THREE.LineBasicMaterial({ toneMapped: false }),
+      geometry,
+      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, toneMapped: false }),
     );
+    line.frustumCulled = false; // far longer than the view; never skip it
     const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({ sizeAttenuation: false, depthTest: false, toneMapped: false }),
     );
@@ -104,16 +127,25 @@ export function createAxes() {
 }
 
 /**
- * Axes start at the world origin and are a bit shorter than the model.
- * Only the lines are scaled: the labels have a fixed on-screen size and
- * would blow up if their parent were scaled.
+ * Lines reach as far as the grid fades (3× the model size, at least) in both
+ * directions; labels go just past the model's edge on each axis.
  */
 export function fitAxes(axes, box) {
   const size = box.getSize(new THREE.Vector3());
-  const length = Math.max(size.x, size.y, size.z) * 0.6 || 1;
+  const s = Math.max(size.x, size.y, size.z) || 1;
+  const reach = Math.max(s * 3, box.max.length() * 1.5, box.min.length() * 1.5);
   axes.userData.parts.forEach(({ line, sprite }, i) => {
-    line.scale.setScalar(length);
-    sprite.position.copy(AXES[i].dir).multiplyScalar(length * 1.08);
+    const dir = AXES[i].dir;
+    const positions = line.geometry.attributes.position;
+    AXIS_STOPS.forEach((stop, k) => {
+      const p = dir.clone().multiplyScalar(stop.t * reach);
+      positions.setXYZ(k, p.x, p.y, p.z);
+    });
+    positions.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+
+    const edge = Math.max(box.max.getComponent(i), 0); // model's extent along +axis
+    sprite.position.copy(dir).multiplyScalar(edge + s * 0.12);
   });
 }
 

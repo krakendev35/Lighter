@@ -2,7 +2,9 @@
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
-import { setupTopbar, setupHints, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
+import { setupTopbar, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts, setupStartHint } from './ui.js';
+import { setupKeybindEditor } from './keybinds.js';
+import { setupGuide } from './guide.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
@@ -10,6 +12,20 @@ const viewer = new Viewer(document.getElementById('viewport'));
 const viewCube = new ViewCube(viewer, document.body);
 
 const fileInput = document.getElementById('file-input');
+const keybindEditor = setupKeybindEditor(document.getElementById('keybinds'));
+setupStartHint(document.getElementById('start-hint'));
+// Panel width from theme.css, so the 3D view's shift always matches it.
+const guideWidth = () =>
+  parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--guide-w')) || 300;
+const guide = setupGuide(document.getElementById('guide'), {
+  onCustomize: () => keybindEditor.open(),
+  onChange: (open) => {
+    viewer.setRightInset(open ? guideWidth() : 0); // slides with the panel
+    refreshButtons(); // the ? button shows pressed while open
+  },
+});
+// Guide left open last time: start with the view already shifted, no slide.
+viewer.setRightInset(guide.isOpen() ? guideWidth() : 0, { animate: false });
 
 /* ---------------- Opening files ---------------- */
 
@@ -209,6 +225,12 @@ applyTheme(loadSavedTheme());
 
 const toggleMode = (mode) => viewer.setMode(viewer.mode === mode ? 'shaded' : mode);
 
+/** Rotate / Pan / Zoom tool: what left-drag does (cursor changes to match). */
+function setTool(tool) {
+  viewer.setTool(tool);
+  document.body.dataset.tool = tool;
+}
+
 let refreshButtons = () => {};
 const withRefresh = (fn) => () => {
   fn();
@@ -218,23 +240,32 @@ const withRefresh = (fn) => () => {
 const actions = {
   open: pickFile,
   shaded: withRefresh(() => viewer.setMode('shaded')),
-  wireframe: withRefresh(() => viewer.setMode('wireframe')),
-  edges: withRefresh(() => viewer.setMode('edges')),
-  toggleWireframe: withRefresh(() => toggleMode('wireframe')),
-  toggleEdges: withRefresh(() => toggleMode('edges')),
+  // Button and key both toggle: a second press goes back to shaded.
+  wireframe: withRefresh(() => toggleMode('wireframe')),
+  edges: withRefresh(() => toggleMode('edges')),
   clay: withRefresh(() => viewer.toggleClay()),
   grid: withRefresh(() => viewer.toggleGrid()),
   axes: withRefresh(() => viewer.toggleAxes()),
   theme: withRefresh(() => applyTheme(viewer.theme === 'dark' ? 'light' : 'dark')),
-  fit: () => viewer.frame({ keepDirection: true }),
+  fit: () => viewer.frame({ keepDirection: true, animate: true }),
+  center: () => viewer.centerModel(),
+  rotate: withRefresh(() => setTool('rotate')),
+  pan: withRefresh(() => setTool('pan')),
+  zoom: withRefresh(() => setTool('zoom')),
   screenshot: () => saveScreenshot().catch((err) => console.error('Screenshot failed:', err)),
   playPause: () => viewer.player?.toggle(),
+  guide: () => guide.toggle(),
+  keybinds: () => keybindEditor.open(),
   previousFile: () => stepFile(-1).catch(console.error),
   nextFile: () => stepFile(1).catch(console.error),
 };
 
 const isActive = (id) =>
   ({
+    guide: guide.isOpen(),
+    rotate: viewer.tool === 'rotate',
+    pan: viewer.tool === 'pan',
+    zoom: viewer.tool === 'zoom',
     shaded: viewer.mode === 'shaded',
     wireframe: viewer.mode === 'wireframe',
     edges: viewer.mode === 'edges',
@@ -245,9 +276,13 @@ const isActive = (id) =>
 
 refreshButtons = setupTopbar(document.getElementById('topbar-buttons'), actions, isActive);
 refreshButtons();
-setupHints(document.getElementById('hints'));
 const resetPlayer = setupPlayer(document.getElementById('player'), viewer);
-setupAutoHide(['topbar', 'hints', 'player'].map((id) => document.getElementById(id)));
+setupAutoHide(['topbar', 'player'].map((id) => document.getElementById(id)));
+
+// Turn transitions on once the first frames are drawn (see .booting in theme.css).
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => document.documentElement.classList.remove('booting')),
+);
 setupShortcuts(actions);
 
 /* ---------------- Drag & drop ---------------- */

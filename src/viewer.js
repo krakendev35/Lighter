@@ -27,6 +27,7 @@ export const THEMES = {
 const ISO_DIRECTION = new THREE.Vector3(1, 0.8, 1).normalize();
 const SNAP_MS = 300;
 const POLE_EPS = 1e-4; // radians away from straight up/down
+const INSET_MS = 260; // matches --slide-ms in theme.css (guide panel slide)
 
 export class Viewer {
   constructor(container) {
@@ -77,18 +78,29 @@ export class Viewer {
     this.model = null;
     this.box = null;
     this.snap = null; // running camera animation (view cube)
+    this.glide = null; // running "center model" animation
+    this.setTool('rotate');
     this.frameCallbacks = [];
 
     this.player = null; // AnimationPlayer when the model has animations
     this.lastFrame = performance.now();
 
-    window.addEventListener('resize', () => this.onResize());
+    // Width covered on the right (the guide panel). The canvas keeps its full
+    // size underneath; only the camera's framing shifts so the model centres
+    // in the part that's still visible. Resizing the canvas instead would
+    // reallocate its whole drawing surface on every frame of the slide.
+    this.rightInset = 0;
+    this.insetAnim = null;
+
+    new ResizeObserver(() => this.onResize()).observe(container);
     this.renderer.setAnimationLoop((now) => {
       // Cap the step so switching back to the window doesn't jump the animation.
       const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
       this.lastFrame = now;
       this.player?.update(dt);
+      if (this.insetAnim) this.stepInset(now);
       if (this.snap) this.stepSnap(now);
+      else if (this.glide) this.stepGlide(now);
       else this.controls.update();
       this.renderer.render(this.scene, this.camera);
       for (const cb of this.frameCallbacks) cb();
@@ -104,7 +116,44 @@ export class Viewer {
     const { clientWidth: w, clientHeight: h } = this.container;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.applyViewOffset();
     this.renderer.setSize(w, h);
+    // Resizing wipes the canvas, and this runs after the frame's normal draw
+    // but before it reaches the screen. Draw again right away, or the model
+    // blinks out while the window is being resized.
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Keep `px` on the right free (guide panel open): the model centres in the
+   * remaining width. Animated over the panel's slide unless `animate` is false
+   * or Windows is set to reduce animations.
+   */
+  setRightInset(px, { animate = true } = {}) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!animate || reduce) {
+      this.insetAnim = null;
+      this.rightInset = px;
+      this.applyViewOffset();
+      return;
+    }
+    this.insetAnim = { from: this.rightInset, to: px, start: performance.now() };
+  }
+
+  stepInset(now) {
+    const a = this.insetAnim;
+    const t = Math.min(1, (now - a.start) / INSET_MS);
+    const eased = 1 - Math.pow(1 - t, 3); // same feel as the panel's CSS ease-out
+    this.rightInset = a.from + (a.to - a.from) * eased;
+    this.applyViewOffset();
+    if (t === 1) this.insetAnim = null;
+  }
+
+  /** Shift the picture left by half the inset (no resize, just the projection). */
+  applyViewOffset() {
+    const { clientWidth: w, clientHeight: h } = this.container;
+    if (this.rightInset > 0.5) this.camera.setViewOffset(w, h, this.rightInset / 2, 0, w, h);
+    else this.camera.clearViewOffset();
   }
 
   /* ---------------- Model ---------------- */
@@ -131,12 +180,109 @@ export class Viewer {
     fitAxes(this.axes, this.box);
     this.applyDisplay();
     this.frame();
+    this.reveal();
   }
 
-  /** Point the camera so the whole model fits in view. */
-  frame({ keepDirection = false } = {}) {
+  /* ---------------- View tools ---------------- */
+
+  /**
+   * Choose what LEFT-drag does: 'rotate', 'pan' or 'zoom'. Right-drag always
+   * pans and the wheel / middle-drag always zoom, whatever the tool.
+   */
+  setTool(tool) {
+    this.tool = tool;
+    this.controls.mouseButtons = {
+      LEFT: { rotate: THREE.MOUSE.ROTATE, pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY }[tool],
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+  }
+
+  /**
+   * Bring the model back to the middle of the screen (after panning), keeping
+   * the current zoom and viewing angle. Camera and orbit point slide together
+   * over ~300 ms.
+   */
+  centerModel() {
+    if (!this.box || this.box.isEmpty()) return;
+    const delta = this.box.getCenter(new THREE.Vector3()).sub(this.controls.target);
+    this.glideTo(this.controls.target.clone().add(delta), this.camera.position.clone().add(delta));
+  }
+
+  /**
+   * Slide the orbit point and the camera to new positions over ~300 ms
+   * (Center and Fit). Both move together, so the view never swings.
+   */
+  glideTo(toTarget, toPosition, { near, far, duration = SNAP_MS, easeOut = false } = {}) {
+    this.snap = null;
+    // While moving, keep the clipping range wide enough for both ends of the
+    // glide; the final values are set when it lands.
+    if (near !== undefined) {
+      this.camera.near = Math.min(this.camera.near, near);
+      this.camera.far = Math.max(this.camera.far, far);
+      this.camera.updateProjectionMatrix();
+    }
+    this.glide = {
+      fromTarget: this.controls.target.clone(),
+      fromPosition: this.camera.position.clone(),
+      toTarget,
+      toPosition,
+      near,
+      far,
+      duration,
+      easeOut,
+      start: performance.now(),
+    };
+  }
+
+  stepGlide(now) {
+    const g = this.glide;
+    const t = Math.min(1, (now - g.start) / g.duration);
+    const eased = g.easeOut
+      ? 1 - Math.pow(1 - t, 3) // fast start, soft landing (model reveal)
+      : t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    this.controls.target.lerpVectors(g.fromTarget, g.toTarget, eased);
+    this.camera.position.lerpVectors(g.fromPosition, g.toPosition, eased);
+    this.camera.lookAt(this.controls.target);
+    if (t === 1) {
+      if (g.near !== undefined) {
+        this.camera.near = g.near;
+        this.camera.far = g.far;
+        this.camera.updateProjectionMatrix();
+      }
+      this.glide = null;
+      this.controls.update();
+    }
+  }
+
+  /**
+   * Opening animation for a newly loaded model: the camera starts a bit
+   * farther out and turned slightly, then settles on the framed view.
+   * Skipped when Windows is set to reduce animations.
+   */
+  reveal() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const target = this.controls.target.clone();
+    const end = this.camera.position.clone();
+    const start = end
+      .clone()
+      .sub(target)
+      .multiplyScalar(1.3)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(-14))
+      .add(target);
+    this.camera.position.copy(start);
+    this.camera.lookAt(target);
+    this.glideTo(target, end, { duration: 700, easeOut: true });
+  }
+
+  /**
+   * Point the camera so the whole model fits in view. `animate` glides there
+   * like Center (the F key / Fit button); a newly opened model is framed at once.
+   */
+  frame({ keepDirection = false, animate = false } = {}) {
     if (!this.box || this.box.isEmpty()) return;
     this.snap = null;
+    this.glide = null;
 
     const sphere = this.box.getBoundingSphere(new THREE.Sphere());
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
@@ -145,11 +291,18 @@ export class Viewer {
     const direction = keepDirection
       ? this.camera.position.clone().sub(this.controls.target).normalize()
       : ISO_DIRECTION;
-    this.camera.position.copy(sphere.center).addScaledVector(direction, distance);
-    this.camera.near = distance / 100;
-    this.camera.far = distance * 100;
-    this.camera.updateProjectionMatrix();
+    const position = sphere.center.clone().addScaledVector(direction, distance);
+    const near = distance / 100;
+    const far = distance * 100;
 
+    if (animate) {
+      this.glideTo(sphere.center.clone(), position, { near, far });
+      return;
+    }
+    this.camera.position.copy(position);
+    this.camera.near = near;
+    this.camera.far = far;
+    this.camera.updateProjectionMatrix();
     this.controls.target.copy(sphere.center);
     this.controls.update();
   }
@@ -164,6 +317,7 @@ export class Viewer {
    * from the back.
    */
   viewFrom(direction) {
+    this.glide = null;
     const offset = this.camera.position.clone().sub(this.controls.target);
     const from = new THREE.Spherical().setFromVector3(offset);
     const to = new THREE.Spherical().setFromVector3(direction.clone().normalize());
@@ -265,8 +419,12 @@ export class Viewer {
 
   /** The current view as a PNG (the 3D view only, no UI). */
   screenshot() {
+    // Without the guide's shift, so the model is centred in the image.
+    this.camera.clearViewOffset();
     this.renderer.render(this.scene, this.camera);
-    return new Promise((resolve) => this.renderer.domElement.toBlob(resolve, 'image/png'));
+    const blob = new Promise((resolve) => this.renderer.domElement.toBlob(resolve, 'image/png'));
+    this.applyViewOffset(); // the next frame is drawn shifted again
+    return blob;
   }
 
   /* ---------------- Info ---------------- */

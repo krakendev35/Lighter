@@ -45,28 +45,26 @@ html, body {
   user-select: none;
 }
 
+/* Always the full window; when the guide opens, the camera's framing shifts
+   instead (Viewer.setRightInset), so the canvas is never resized mid-slide. */
 #viewport { position: fixed; inset: 0; }
 #viewport canvas { display: block; }
 
 /* ---------- Auto-hiding controls ---------- */
-#topbar, #hints, #player {
+#topbar, #player {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity 200ms ease, right var(--slide), left var(--slide);
 }
 body.has-model.controls-visible #topbar,
-body.has-model.controls-visible #hints,
 body.has-animation.controls-visible #player {
   opacity: 1;
   pointer-events: auto;
 }
-/* Hints that only apply to animated models (Space = play/pause). */
-#hints .anim-only { display: none; }
-body.has-animation #hints .anim-only { display: flex; }
 
-/* ---------- Animation player ---------- */
+/* ---------- Animation player (bottom centre, animated models only) ---------- */
 #player {
-  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
   width: min(480px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 10px;
   padding: 4px 12px 4px 4px;
@@ -137,24 +135,15 @@ body:not(.has-animation) #player { display: none; }
 .icon-btn:focus, .outline-btn:focus { outline: none; }
 .icon-btn:focus-visible, .outline-btn:focus-visible { outline: 1px solid var(--text-2); outline-offset: 1px; }
 
-/* ---------- Keyboard hints ---------- */
-#hints {
-  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 16px;
-  padding: 8px 14px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-#hints span { display: flex; align-items: center; gap: 6px; }
+/* ---------- Mouse cursor per view tool ---------- */
+body[data-tool='pan'] #viewport { cursor: move; }
+body[data-tool='zoom'] #viewport { cursor: ns-resize; }
 
 /* ---------- View cube ---------- */
 #viewcube {
   position: fixed; top: 16px; right: 16px;
   width: 96px; height: 96px;
-  transition: top 200ms ease;
+  transition: top 200ms ease, right var(--slide);
   display: none;
 }
 body.has-model #viewcube { display: block; }
@@ -166,13 +155,117 @@ body.controls-visible #viewcube { top: 64px; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   color: var(--text-2);
   pointer-events: none;
+  transition: right var(--slide);
 }
 body.has-model #empty { display: none; }
+
+/* Start screen intro (runs once, when the app opens):
+   1. the cube icon draws its lines,
+   2. while it finishes, each line of text fades up out of a soft blur,
+      one after another,
+   3. the two quiet hint lines come last, separately. */
+#empty > * { animation: fade-up 480ms var(--ease-out) both; }
+#empty > .cube { animation: fade-in 300ms ease both; }
+#empty > :nth-child(2) { animation-delay: 300ms; }  /* Drop a 3D file here */
+#empty > :nth-child(3) { animation-delay: 380ms; }  /* or press Ctrl + O */
+#empty > :nth-child(4) { animation-delay: 450ms; }  /* Open file */
+#empty > :nth-child(5) { animation-delay: 520ms; }  /* formats */
+#empty > #start-hint { animation: none; }
+#start-hint p { animation: fade-up 520ms var(--ease-out) both; }
+#start-hint p:nth-child(1) { animation-delay: 620ms; }
+#start-hint p:nth-child(2) { animation-delay: 700ms; }
+#empty .cube path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 900ms var(--ease-out) 80ms forwards; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
 #empty .cube { color: var(--text); margin-bottom: 8px; }
 #empty h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
 #empty p { margin: 0; }
 #empty .formats { margin-top: 12px; font-size: 11px; }
 body.dragging #empty { color: var(--text); }
+
+/* Quiet hint under the upload area */
+#start-hint {
+  margin-top: 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  font-size: 12px;
+}
+#start-hint p { display: flex; align-items: center; gap: 10px; }
+#start-hint p:last-child { gap: 6px; }
+#start-hint .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border); }
+
+/* ---------- Guide side panel ---------- */
+/* Always in the page, parked just off the right edge; sliding it in and out
+   is a transform. `visibility` flips at the end of the slide-out so the
+   closed panel can't be tabbed into or clicked. */
+#guide {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: var(--guide-w);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  z-index: 5;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform var(--slide), visibility 0s linear var(--slide-ms);
+}
+body.guide-open #guide {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--slide), visibility 0s;
+}
+#guide header {
+  height: 48px; flex: 0 0 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 8px 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+#guide h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.guide-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 12px; }
+.guide-list::-webkit-scrollbar { width: 8px; }
+.guide-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.guide-list::-webkit-scrollbar-button { display: none; }
+#guide h3 {
+  margin: 16px 0 6px;
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+#guide .anim-only { display: none; }
+body.has-animation #guide .anim-only { display: block; }
+.guide-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.guide-row .keys { display: flex; gap: 4px; flex-shrink: 0; white-space: nowrap; }
+#guide footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-2);
+}
+#guide footer .outline-btn { margin-top: 0; padding: 4px 10px; font-size: 11px; flex-shrink: 0; }
+#guide-toggle-note { white-space: nowrap; }
+
+/* While the guide is open everything else makes room for it, sliding over
+   the same time and curve as the panel. */
+:root {
+  --guide-w: 300px;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --slide-ms: 260ms;
+  --slide: var(--slide-ms) var(--ease-out);
+}
+body.guide-open #topbar,
+body.guide-open #empty { right: var(--guide-w); }
+body.guide-open #viewcube { right: calc(var(--guide-w) + 16px); }
+body.guide-open #player { left: calc((100% - var(--guide-w)) / 2); }
+
+/* While the app starts, restored state (e.g. an open guide) appears in place
+   instead of sliding in. main.js removes .booting after the first frames. */
+.booting *, .booting *::before, .booting *::after { transition: none !important; }
+
+/* Windows "Show animations" off: no slides, no intro. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: 0s !important; transition-delay: 0s !important; }
+  #empty .cube path { stroke-dashoffset: 0; }
+}
 
 kbd {
   font-family: inherit; font-size: 11px;
@@ -195,3 +288,61 @@ kbd {
   pointer-events: auto;
 }
 .outline-btn:hover { background: var(--hover); }
+.outline-btn:disabled { opacity: 0.4; cursor: default; background: transparent; }
+
+/* ---------- Keybind editor ---------- */
+#keybinds:not([hidden]) {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+.kb-panel {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+.kb-panel header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.kb-panel h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.kb-list { overflow-y: auto; padding: 4px 16px 12px; }
+.kb-list::-webkit-scrollbar { width: 8px; }
+.kb-list::-webkit-scrollbar-track { background: transparent; }
+.kb-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.kb-list::-webkit-scrollbar-button { display: none; }
+.kb-panel h3 {
+  margin: 12px 0 4px;
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.kb-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.kb-key {
+  min-width: 64px;
+  font: inherit; font-size: 11px; font-weight: 500;
+  padding: 3px 8px;
+  color: var(--text);
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.kb-key:hover { border-color: var(--text-2); }
+.kb-key.unset { color: var(--text-2); }
+.kb-key.active { background: var(--active-bg); color: var(--active-fg); border-color: var(--active-bg); }
+.kb-key:focus { outline: none; }
+.kb-key:focus-visible { outline: 1px solid var(--text-2); outline-offset: 1px; }
+.kb-panel footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+}
+.kb-panel footer .outline-btn { margin-top: 0; flex-shrink: 0; }

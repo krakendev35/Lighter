@@ -1,10 +1,25 @@
-// Top bar, keyboard hints, auto-hide and keyboard shortcuts.
+// Top bar, animation player, auto-hide and keyboard shortcuts.
+// Every shortcut is shown in its button's tooltip, taken from the keymap so
+// it stays right after the user rebinds keys.
+import { keymap, keyFromEvent, displayKey } from './keymap.js';
 
 const HIDE_AFTER_MS = 2000;
+
+/** "Label (Key)" for tooltips; just "Label" when the action has no key. */
+function withKey(id, label = keymap.label(id)) {
+  const key = displayKey(keymap.get(id));
+  return key ? `${label} (${key})` : label;
+}
+
 
 // Thin-line 18px icons, 1.5px stroke (see theme.css for stroke settings).
 const ICONS = {
   open: '<path d="M2.5 4.5h4.5l1.5 1.5h7v8.5h-13z"/>',
+  rotate: '<path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/>',
+  pan: '<path d="M9 2v14M2 9h14M7 4l2-2 2 2M7 14l2 2 2-2M4 7 2 9l2 2M14 7l2 2-2 2"/>',
+  zoom: '<circle cx="8" cy="8" r="5"/><path d="M11.6 11.6 15.5 15.5M8 6v4M6 8h4"/>',
+  center: '<circle cx="9" cy="9" r="5"/><circle cx="9" cy="9" r="1" fill="currentColor"/><path d="M9 1.5V4M9 14v2.5M1.5 9H4M14 9h2.5"/>',
+  fit: '<path d="M2.5 6V2.5H6M12 2.5h3.5V6M15.5 12v3.5H12M6 15.5H2.5V12"/><rect x="6" y="6" width="6" height="6" rx=".5"/>',
   shaded:
     '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13a3.5 6.5 0 0 0 0-13z" fill="currentColor" stroke="none"/>',
   wireframe: '<circle cx="9" cy="9" r="6.5"/><ellipse cx="9" cy="9" rx="2.8" ry="6.5"/><path d="M2.5 9h13"/>',
@@ -16,35 +31,35 @@ const ICONS = {
   screenshot:
     '<rect x="2.5" y="5" width="13" height="9.5" rx="1"/><circle cx="9" cy="9.75" r="2.5"/><path d="M6.5 5l1-2h3l1 2"/>',
   theme: '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
+  guide:
+    '<circle cx="9" cy="9" r="6.75"/><path d="M7.1 7.1a1.9 1.9 0 1 1 2.65 1.75c-.45.2-.75.6-.75 1.1v.4"/><circle cx="9" cy="12.6" r=".2" fill="currentColor"/>',
   play: '<path d="M6 4v10l8-5z" fill="currentColor"/>',
   pause: '<path d="M6.5 4.5v9M11.5 4.5v9"/>',
 };
 
-// '|' = divider between button groups.
+// '|' = divider between button groups. Button ids are keymap action ids;
+// `extra` is appended to the tooltip after the label and key.
 const BUTTONS = [
-  { id: 'open', title: 'Open file (Ctrl+O)' },
+  { id: 'open' },
   '|',
-  { id: 'shaded', title: 'Shaded' },
-  { id: 'wireframe', title: 'Wireframe (W)' },
-  { id: 'edges', title: 'Shaded + edges (E)' },
-  { id: 'clay', title: 'Clay (C)' },
+  { id: 'rotate', extra: 'left-drag rotates' },
+  { id: 'pan', extra: 'left-drag moves the view · right-drag pans with any tool' },
+  { id: 'zoom', extra: 'left-drag up/down zooms · wheel zooms with any tool' },
   '|',
-  { id: 'grid', title: 'Grid (G)' },
-  { id: 'axes', title: 'Axes' },
+  { id: 'center', extra: 'keeps zoom and angle' },
+  { id: 'fit', extra: 'center and zoom to fit' },
   '|',
-  { id: 'screenshot', title: 'Save screenshot (PNG)' },
-  { id: 'theme', title: 'Light / dark theme' },
-];
-
-// [key, label, extra class]; "anim-only" hints show only for animated models.
-const HINTS = [
-  ['W', 'Wireframe'],
-  ['E', 'Edges'],
-  ['C', 'Clay'],
-  ['G', 'Grid'],
-  ['F', 'Fit'],
-  ['← →', 'Prev/next'],
-  ['Space', 'Play/pause', 'anim-only'],
+  { id: 'shaded' },
+  { id: 'wireframe' },
+  { id: 'edges' },
+  { id: 'clay' },
+  '|',
+  { id: 'grid' },
+  { id: 'axes' },
+  '|',
+  { id: 'screenshot', extra: 'PNG' },
+  { id: 'theme' },
+  { id: 'guide', extra: 'mouse controls and every shortcut' },
 ];
 
 /**
@@ -62,25 +77,27 @@ export function setupTopbar(container, actions, isActive) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'icon-btn';
-    el.title = b.title;
-    el.setAttribute('aria-label', b.title);
     el.innerHTML = `<svg viewBox="0 0 18 18" width="18" height="18">${ICONS[b.id]}</svg>`;
     el.addEventListener('click', () => actions[b.id]());
     container.appendChild(el);
-    buttons[b.id] = el;
+    buttons[b.id] = { el, extra: b.extra };
   }
 
+  function updateTitles() {
+    for (const [id, { el, extra }] of Object.entries(buttons)) {
+      const title = extra ? `${withKey(id)} · ${extra}` : withKey(id);
+      el.title = title;
+      el.setAttribute('aria-label', title);
+    }
+  }
+  updateTitles();
+  keymap.onChange(updateTitles);
+
   return function refresh() {
-    for (const [id, el] of Object.entries(buttons)) {
+    for (const [id, { el }] of Object.entries(buttons)) {
       el.classList.toggle('active', isActive(id));
     }
   };
-}
-
-export function setupHints(container) {
-  container.innerHTML = HINTS.map(
-    ([key, label, cls = '']) => `<span class="${cls}"><kbd>${key}</kbd>${label}</span>`,
-  ).join('');
 }
 
 /**
@@ -90,7 +107,7 @@ export function setupHints(container) {
  */
 export function setupPlayer(container, viewer) {
   container.innerHTML = `
-    <button type="button" class="icon-btn" id="play-btn" aria-label="Play / pause (Space)" title="Play / pause (Space)"></button>
+    <button type="button" class="icon-btn" id="play-btn"></button>
     <input type="range" id="timeline" min="0" max="1" step="0.001" value="0" aria-label="Timeline" />
     <span id="anim-time"></span>
     <select id="clip-select" aria-label="Animation"></select>`;
@@ -100,6 +117,13 @@ export function setupPlayer(container, viewer) {
   const select = container.querySelector('#clip-select');
   let dragging = false;
   let shownPlaying = null;
+
+  const updatePlayTitle = () => {
+    playBtn.title = withKey('playPause');
+    playBtn.setAttribute('aria-label', playBtn.title);
+  };
+  updatePlayTitle();
+  keymap.onChange(updatePlayTitle);
 
   const fmt = (t) => {
     const m = Math.floor(t / 60);
@@ -187,6 +211,22 @@ export function setupAutoHide(panels) {
   });
 }
 
+/**
+ * Start screen hint: one quiet line about the mouse, one about the guide.
+ * The guide's key comes from the keymap; the second line is left out when
+ * the guide has no key.
+ */
+export function setupStartHint(container) {
+  function render() {
+    const key = displayKey(keymap.get('guide'));
+    container.innerHTML = `
+      <p>Drag to rotate<span class="dot"></span>Right-drag to pan<span class="dot"></span>Scroll to zoom</p>
+      ${key ? `<p>Press <kbd>${escapeHtml(key)}</kbd> any time to see every shortcut</p>` : ''}`;
+  }
+  render();
+  keymap.onChange(render);
+}
+
 /** Write file name, short meta and the detail tooltip into the top bar. */
 export function setFileInfo(name, { triangles, vertices, size }, { format, bytes }) {
   const fmt = (n) => (n >= 100 ? Math.round(n) : n.toFixed(1));
@@ -203,31 +243,22 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-/** Global keyboard shortcuts. `actions` is the same map the top bar uses. */
+/**
+ * Global keyboard shortcuts, looked up in the keymap. `actions` is the same
+ * map the top bar uses (keymap action id → function).
+ */
 export function setupShortcuts(actions) {
   window.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key.toLowerCase() === 'o') {
-      e.preventDefault();
-      actions.open();
-      return;
-    }
-    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
-    // The clip picker keeps all its keys; the timeline slider keeps its arrow
-    // keys (frame stepping) but Space always means play/pause.
+    if (e.repeat) return;
+    // The clip picker keeps all its keys; the timeline slider keeps the keys
+    // it uses for stepping (arrows, Home/End, Page Up/Down).
     if (e.target.closest?.('select')) return;
-    if (e.target.type === 'range' && e.key !== ' ') return;
-    const key = {
-      w: 'toggleWireframe',
-      e: 'toggleEdges',
-      c: 'clay',
-      g: 'grid',
-      f: 'fit',
-      ' ': 'playPause',
-      arrowleft: 'previousFile',
-      arrowright: 'nextFile',
-    }[e.key.toLowerCase()];
-    if (!key) return;
-    e.preventDefault(); // Space would otherwise "click" the last focused button
-    actions[key]();
+    if (e.target.type === 'range' && /^(Arrow|Home$|End$|Page)/.test(e.key)) return;
+
+    const key = keyFromEvent(e);
+    const id = key && keymap.actionFor(key);
+    if (!id || !actions[id]) return;
+    e.preventDefault(); // e.g. Space would otherwise "click" the last focused button
+    actions[id]();
   });
 }

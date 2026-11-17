@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" class="booting">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,7 +9,7 @@
   <body>
     <div id="viewport"></div>
 
-    <!-- Top bar and key hints: shown on mouse move, hidden after ~2 s (ui.js) -->
+    <!-- Top bar and animation player: shown on mouse move, hidden after ~2 s (ui.js) -->
     <header id="topbar">
       <div class="file">
         <span id="file-name"></span>
@@ -19,18 +19,25 @@
     </header>
 
     <div id="player"></div>
-    <div id="hints"></div>
+
+    <!-- Guide side panel (guide.js), toggled with ? or the top-bar button -->
+    <aside id="guide" aria-label="Guide" inert></aside>
+
+    <!-- Keybind editor (keybinds.js), opened from the guide's "Customize keys" -->
+    <div id="keybinds" hidden></div>
 
     <!-- Empty state -->
     <section id="empty">
       <svg class="cube" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
-        <path d="M32 6 56 19v26L32 58 8 45V19z" />
-        <path d="M8 19l24 13 24-13M32 32v26" />
+        <path d="M32 6 56 19v26L32 58 8 45V19z" pathLength="1" />
+        <path d="M8 19l24 13 24-13M32 32v26" pathLength="1" />
       </svg>
       <h1>Drop a 3D file here</h1>
       <p>or press <kbd>Ctrl</kbd> + <kbd>O</kbd></p>
       <button id="open-btn" class="outline-btn" type="button">Open file</button>
       <p class="formats">STL · OBJ · glTF · GLB · FBX · PLY · 3MF</p>
+      <!-- Quiet hint: mouse basics + the key that opens the guide (ui.js) -->
+      <div id="start-hint"></div>
     </section>
 
     <input id="file-input" type="file" multiple hidden />
