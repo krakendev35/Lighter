@@ -2,27 +2,29 @@
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, extensionOf, SUPPORTED } from './loaders.js';
-import { setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
+import { setupTopbar, setupHints, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
 const viewer = new Viewer(document.getElementById('viewport'));
-new ViewCube(viewer);
+const viewCube = new ViewCube(viewer, document.body);
 
-const emptyState = document.getElementById('empty');
 const fileInput = document.getElementById('file-input');
+
+/* ---------------- Opening files ---------------- */
 
 /** Show a model from raw bytes + its file name. */
 async function showModel(buffer, name) {
-  if (!SUPPORTED.includes(extensionOf(name))) {
+  const format = extensionOf(name);
+  if (!SUPPORTED.includes(format)) {
     console.warn(`Unsupported file: ${name}`);
     return;
   }
   try {
     const { object } = await loadModel(buffer, name);
     viewer.setModel(object);
-    emptyState.classList.add('gone');
-    setFileInfo(name, viewer.stats());
+    document.body.classList.add('has-model');
+    setFileInfo(name, viewer.stats(), { format, bytes: buffer.byteLength });
     setWindowTitle(`${name} — Lighter`);
   } catch (err) {
     console.error(err);
@@ -62,7 +64,76 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-// Drag & drop
+/* ---------------- Theme ---------------- */
+
+function loadSavedTheme() {
+  try {
+    return localStorage.getItem('lighter.theme') === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+async function applyTheme(name) {
+  document.documentElement.dataset.theme = name;
+  try {
+    localStorage.setItem('lighter.theme', name);
+  } catch {
+    /* not critical */
+  }
+  viewer.setTheme(name);
+  viewCube.setTheme(name);
+  // Match the native Windows title bar.
+  if (IN_TAURI) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    getCurrentWindow().setTheme(name);
+  }
+}
+
+applyTheme(loadSavedTheme());
+
+/* ---------------- Controls ---------------- */
+
+const toggleMode = (mode) => viewer.setMode(viewer.mode === mode ? 'shaded' : mode);
+
+let refreshButtons = () => {};
+const withRefresh = (fn) => () => {
+  fn();
+  refreshButtons();
+};
+
+const actions = {
+  open: pickFile,
+  shaded: withRefresh(() => viewer.setMode('shaded')),
+  wireframe: withRefresh(() => viewer.setMode('wireframe')),
+  edges: withRefresh(() => viewer.setMode('edges')),
+  toggleWireframe: withRefresh(() => toggleMode('wireframe')),
+  toggleEdges: withRefresh(() => toggleMode('edges')),
+  clay: withRefresh(() => viewer.toggleClay()),
+  grid: withRefresh(() => viewer.toggleGrid()),
+  axes: withRefresh(() => viewer.toggleAxes()),
+  theme: withRefresh(() => applyTheme(viewer.theme === 'dark' ? 'light' : 'dark')),
+  fit: () => viewer.frame({ keepDirection: true }),
+};
+
+const isActive = (id) =>
+  ({
+    shaded: viewer.mode === 'shaded',
+    wireframe: viewer.mode === 'wireframe',
+    edges: viewer.mode === 'edges',
+    clay: viewer.clay,
+    grid: viewer.showGrid,
+    axes: viewer.showAxes,
+  })[id] ?? false;
+
+refreshButtons = setupTopbar(document.getElementById('topbar-buttons'), actions, isActive);
+refreshButtons();
+setupHints(document.getElementById('hints'));
+setupAutoHide([document.getElementById('topbar'), document.getElementById('hints')]);
+setupShortcuts(actions);
+
+/* ---------------- Drag & drop ---------------- */
+
 const setDragging = (on) => document.body.classList.toggle('dragging', on);
 
 if (IN_TAURI) {
@@ -91,6 +162,8 @@ if (IN_TAURI) {
   });
 }
 
+/* ---------------- Files from Windows ---------------- */
+
 if (IN_TAURI) {
   const { invoke } = await import('@tauri-apps/api/core');
   const { listen } = await import('@tauri-apps/api/event');
@@ -103,6 +176,3 @@ if (IN_TAURI) {
   const startup = await invoke('startup_file');
   if (startup) openPath(startup);
 }
-
-setupAutoHide(document.getElementById('topbar'));
-setupShortcuts({ open: pickFile, frame: () => viewer.frame() });
