@@ -10,6 +10,7 @@ export class AnimationPlayer {
     this.mixer = new THREE.AnimationMixer(root);
     this.clips = clips.filter((c) => c.duration > 0);
     this.playing = true; // start playing straight away, like a video
+    this.scrubbing = false; // true while the timeline knob is held: time stands still
     this.action = null;
     this.index = -1;
     if (this.clips.length) this.select(0);
@@ -47,7 +48,7 @@ export class AnimationPlayer {
   }
 
   update(dt) {
-    if (this.playing) this.mixer.update(dt);
+    if (this.playing && !this.scrubbing) this.mixer.update(dt);
   }
 
   dispose() {

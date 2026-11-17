@@ -108,10 +108,22 @@ export function setupPlayer(container, viewer) {
   };
 
   playBtn.addEventListener('click', () => viewer.player?.toggle());
-  slider.addEventListener('pointerdown', () => (dragging = true));
-  slider.addEventListener('pointerup', () => (dragging = false));
+  // Holding the knob freezes the animation where the knob is; letting go
+  // carries on as before (playing or paused). The release is caught on the
+  // window, so it still counts when the mouse is let go outside the slider.
+  slider.addEventListener('pointerdown', () => {
+    dragging = true;
+    if (viewer.player) viewer.player.scrubbing = true;
+  });
+  window.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    if (viewer.player) viewer.player.scrubbing = false;
+    slider.blur(); // so Space goes back to play/pause instead of the slider
+  });
   slider.addEventListener('input', () => viewer.player?.seek(Number(slider.value)));
   select.addEventListener('change', () => {
+    select.blur();
     viewer.player?.select(Number(select.value));
     reset();
   });
@@ -200,8 +212,10 @@ export function setupShortcuts(actions) {
       return;
     }
     if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
-    // Let the timeline slider / clip picker keep their own arrow keys.
-    if (e.target.closest?.('input, select')) return;
+    // The clip picker keeps all its keys; the timeline slider keeps its arrow
+    // keys (frame stepping) but Space always means play/pause.
+    if (e.target.closest?.('select')) return;
+    if (e.target.type === 'range' && e.key !== ' ') return;
     const key = {
       w: 'toggleWireframe',
       e: 'toggleEdges',
