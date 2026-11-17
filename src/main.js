@@ -36,9 +36,13 @@ async function openFile(file) {
 
 /** Open a file by its path on disk (desktop app only). */
 async function openPath(path) {
-  const { invoke } = await import('@tauri-apps/api/core');
-  const buffer = await invoke('read_file', { path });
-  showModel(buffer, path.split(/[\\/]/).pop());
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const buffer = await invoke('read_file', { path });
+    showModel(buffer, path.split(/[\\/]/).pop());
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function setWindowTitle(title) {
@@ -85,6 +89,19 @@ if (IN_TAURI) {
     const file = e.dataTransfer.files[0];
     if (file) openFile(file);
   });
+}
+
+if (IN_TAURI) {
+  const { invoke } = await import('@tauri-apps/api/core');
+  const { listen } = await import('@tauri-apps/api/event');
+
+  // File double-clicked while Lighter was already open: the second launch
+  // forwards its path here instead of opening a new window.
+  listen('open-file', ({ payload }) => openPath(payload));
+
+  // File this launch was started with (double-click / "Open with" / command line).
+  const startup = await invoke('startup_file');
+  if (startup) openPath(startup);
 }
 
 setupAutoHide(document.getElementById('topbar'));
