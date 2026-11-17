@@ -49,24 +49,20 @@ html, body {
 #viewport canvas { display: block; }
 
 /* ---------- Auto-hiding controls ---------- */
-#topbar, #hints, #player {
+#topbar, #player {
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms ease;
 }
 body.has-model.controls-visible #topbar,
-body.has-model.controls-visible #hints,
 body.has-animation.controls-visible #player {
   opacity: 1;
   pointer-events: auto;
 }
-/* Hints that only apply to animated models (Space = play/pause). */
-#hints .anim-only { display: none; }
-body.has-animation #hints .anim-only { display: flex; }
 
-/* ---------- Animation player ---------- */
+/* ---------- Animation player (bottom centre, animated models only) ---------- */
 #player {
-  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
   width: min(480px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 10px;
   padding: 4px 12px 4px 4px;
@@ -137,18 +133,9 @@ body:not(.has-animation) #player { display: none; }
 .icon-btn:focus, .outline-btn:focus { outline: none; }
 .icon-btn:focus-visible, .outline-btn:focus-visible { outline: 1px solid var(--text-2); outline-offset: 1px; }
 
-/* ---------- Keyboard hints ---------- */
-#hints {
-  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 16px;
-  padding: 8px 14px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-#hints span { display: flex; align-items: center; gap: 6px; }
+/* ---------- Mouse cursor per view tool ---------- */
+body[data-tool='pan'] #viewport { cursor: move; }
+body[data-tool='zoom'] #viewport { cursor: ns-resize; }
 
 /* ---------- View cube ---------- */
 #viewcube {

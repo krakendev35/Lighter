@@ -31,8 +31,10 @@ Surveyed: F3D, Online 3D Viewer (3dviewer.net), three.js glTF Viewer, Exhibit, f
 Mockups: Design canvas "3D Viewer — UI drafts" (https://claude.ai/artifact/PwEa1cpxJtDrB9qrn3TL8M). **Reference board: "Zen · Poppins — FINAL"** (Zen layout in the chosen font). Drafts A (floating toolbar) and B (edge rail) were rejected.
 - The model is alone on screen by default — **no controls visible while idle**.
 - Moving the mouse reveals:
-  - **Top bar** (48px, full width): left = file name (semibold) + secondary meta (triangle count · dimensions); right = icon buttons: Open | Shaded, Wireframe, Shaded+edges, Clay | Grid, Axes | Screenshot, Theme.
-  - **Keyboard-hint strip** (bottom-center, small panel): W Wireframe · E Edges · C Clay · G Grid · F Fit · ← → Prev/next file.
+  - **Top bar** (48px, full width): left = file name (semibold) + secondary meta (triangle count · dimensions); right = icon buttons: Open | Rotate, Pan, Zoom | Center, Fit | Shaded, Wireframe, Shaded+edges, Clay | Grid, Axes | Screenshot, Theme.
+  - **Animation player** (bottom-center, animated models only): play/pause, timeline, time, clip picker.
+- **No keyboard-hint strip** (removed: it cluttered the screen together with the player). Each shortcut is shown in its button's tooltip: R Rotate · P Pan · Z Zoom · H Center · F Fit · W Wireframe · E Edges · C Clay · G Grid · Space Play/pause · ← → Prev/next file.
+- **View tools:** the selected tool decides what left-drag does (rotate / pan / zoom); right-drag always pans and the wheel always zooms. **Center (H)** slides the model back to the middle keeping zoom and angle; **Fit (F)** centres and zooms to fit.
 - Controls fade out again after ~2 s without mouse movement (and while orbiting); they stay visible while the cursor is over them.
 - **View cube** always visible, top-right (below the top bar when it's shown).
 - Info panel from earlier plan is folded into the top bar meta; full details (vertices, file size, format) can show on hover/click of the file name.

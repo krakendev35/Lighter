@@ -77,6 +77,8 @@ export class Viewer {
     this.model = null;
     this.box = null;
     this.snap = null; // running camera animation (view cube)
+    this.glide = null; // running "center model" animation
+    this.setTool('rotate');
     this.frameCallbacks = [];
 
     this.player = null; // AnimationPlayer when the model has animations
@@ -89,6 +91,7 @@ export class Viewer {
       this.lastFrame = now;
       this.player?.update(dt);
       if (this.snap) this.stepSnap(now);
+      else if (this.glide) this.stepGlide(now);
       else this.controls.update();
       this.renderer.render(this.scene, this.camera);
       for (const cb of this.frameCallbacks) cb();
@@ -133,10 +136,57 @@ export class Viewer {
     this.frame();
   }
 
+  /* ---------------- View tools ---------------- */
+
+  /**
+   * Choose what LEFT-drag does: 'rotate', 'pan' or 'zoom'. Right-drag always
+   * pans and the wheel / middle-drag always zoom, whatever the tool.
+   */
+  setTool(tool) {
+    this.tool = tool;
+    this.controls.mouseButtons = {
+      LEFT: { rotate: THREE.MOUSE.ROTATE, pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY }[tool],
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+  }
+
+  /**
+   * Bring the model back to the middle of the screen (after panning), keeping
+   * the current zoom and viewing angle. Camera and orbit point slide together
+   * over ~300 ms.
+   */
+  centerModel() {
+    if (!this.box || this.box.isEmpty()) return;
+    this.snap = null;
+    const center = this.box.getCenter(new THREE.Vector3());
+    this.glide = {
+      fromTarget: this.controls.target.clone(),
+      fromPosition: this.camera.position.clone(),
+      delta: center.sub(this.controls.target),
+      start: performance.now(),
+    };
+  }
+
+  stepGlide(now) {
+    const { fromTarget, fromPosition, delta, start } = this.glide;
+    const t = Math.min(1, (now - start) / SNAP_MS);
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const offset = delta.clone().multiplyScalar(eased);
+    this.controls.target.copy(fromTarget).add(offset);
+    this.camera.position.copy(fromPosition).add(offset);
+    this.camera.lookAt(this.controls.target);
+    if (t === 1) {
+      this.glide = null;
+      this.controls.update();
+    }
+  }
+
   /** Point the camera so the whole model fits in view. */
   frame({ keepDirection = false } = {}) {
     if (!this.box || this.box.isEmpty()) return;
     this.snap = null;
+    this.glide = null;
 
     const sphere = this.box.getBoundingSphere(new THREE.Sphere());
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
@@ -164,6 +214,7 @@ export class Viewer {
    * from the back.
    */
   viewFrom(direction) {
+    this.glide = null;
     const offset = this.camera.position.clone().sub(this.controls.target);
     const from = new THREE.Spherical().setFromVector3(offset);
     const to = new THREE.Spherical().setFromVector3(direction.clone().normalize());

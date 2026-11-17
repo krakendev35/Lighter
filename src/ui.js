@@ -1,10 +1,16 @@
-// Top bar, keyboard hints, auto-hide and keyboard shortcuts.
+// Top bar, animation player, auto-hide and keyboard shortcuts.
+// Every shortcut is shown in its button's tooltip.
 
 const HIDE_AFTER_MS = 2000;
 
 // Thin-line 18px icons, 1.5px stroke (see theme.css for stroke settings).
 const ICONS = {
   open: '<path d="M2.5 4.5h4.5l1.5 1.5h7v8.5h-13z"/>',
+  rotate: '<path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/>',
+  pan: '<path d="M9 2v14M2 9h14M7 4l2-2 2 2M7 14l2 2 2-2M4 7 2 9l2 2M14 7l2 2-2 2"/>',
+  zoom: '<circle cx="8" cy="8" r="5"/><path d="M11.6 11.6 15.5 15.5M8 6v4M6 8h4"/>',
+  center: '<circle cx="9" cy="9" r="5"/><circle cx="9" cy="9" r="1" fill="currentColor"/><path d="M9 1.5V4M9 14v2.5M1.5 9H4M14 9h2.5"/>',
+  fit: '<path d="M2.5 6V2.5H6M12 2.5h3.5V6M15.5 12v3.5H12M6 15.5H2.5V12"/><rect x="6" y="6" width="6" height="6" rx=".5"/>',
   shaded:
     '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13a3.5 6.5 0 0 0 0-13z" fill="currentColor" stroke="none"/>',
   wireframe: '<circle cx="9" cy="9" r="6.5"/><ellipse cx="9" cy="9" rx="2.8" ry="6.5"/><path d="M2.5 9h13"/>',
@@ -22,7 +28,14 @@ const ICONS = {
 
 // '|' = divider between button groups.
 const BUTTONS = [
-  { id: 'open', title: 'Open file (Ctrl+O)' },
+  { id: 'open', title: 'Open file (Ctrl+O) · ← → previous / next file in the folder' },
+  '|',
+  { id: 'rotate', title: 'Rotate tool (R) · left-drag rotates' },
+  { id: 'pan', title: 'Pan tool (P) · left-drag moves the view · right-drag pans with any tool' },
+  { id: 'zoom', title: 'Zoom tool (Z) · left-drag up/down zooms · wheel zooms with any tool' },
+  '|',
+  { id: 'center', title: 'Center model (H) · keeps zoom and angle' },
+  { id: 'fit', title: 'Fit to view (F) · center and zoom to fit' },
   '|',
   { id: 'shaded', title: 'Shaded' },
   { id: 'wireframe', title: 'Wireframe (W)' },
@@ -34,17 +47,6 @@ const BUTTONS = [
   '|',
   { id: 'screenshot', title: 'Save screenshot (PNG)' },
   { id: 'theme', title: 'Light / dark theme' },
-];
-
-// [key, label, extra class]; "anim-only" hints show only for animated models.
-const HINTS = [
-  ['W', 'Wireframe'],
-  ['E', 'Edges'],
-  ['C', 'Clay'],
-  ['G', 'Grid'],
-  ['F', 'Fit'],
-  ['← →', 'Prev/next'],
-  ['Space', 'Play/pause', 'anim-only'],
 ];
 
 /**
@@ -75,12 +77,6 @@ export function setupTopbar(container, actions, isActive) {
       el.classList.toggle('active', isActive(id));
     }
   };
-}
-
-export function setupHints(container) {
-  container.innerHTML = HINTS.map(
-    ([key, label, cls = '']) => `<span class="${cls}"><kbd>${key}</kbd>${label}</span>`,
-  ).join('');
 }
 
 /**
@@ -222,6 +218,10 @@ export function setupShortcuts(actions) {
       c: 'clay',
       g: 'grid',
       f: 'fit',
+      h: 'center',
+      r: 'rotate',
+      p: 'pan',
+      z: 'zoom',
       ' ': 'playPause',
       arrowleft: 'previousFile',
       arrowright: 'nextFile',

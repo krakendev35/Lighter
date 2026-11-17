@@ -2,7 +2,7 @@
 import { Viewer } from './viewer.js';
 import { ViewCube } from './viewcube.js';
 import { loadModel, makeResolver, extensionOf, SUPPORTED } from './loaders.js';
-import { setupTopbar, setupHints, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
+import { setupTopbar, setupPlayer, setupAutoHide, setFileInfo, setupShortcuts } from './ui.js';
 
 const IN_TAURI = !!window.__TAURI_INTERNALS__;
 
@@ -209,6 +209,12 @@ applyTheme(loadSavedTheme());
 
 const toggleMode = (mode) => viewer.setMode(viewer.mode === mode ? 'shaded' : mode);
 
+/** Rotate / Pan / Zoom tool: what left-drag does (cursor changes to match). */
+function setTool(tool) {
+  viewer.setTool(tool);
+  document.body.dataset.tool = tool;
+}
+
 let refreshButtons = () => {};
 const withRefresh = (fn) => () => {
   fn();
@@ -227,6 +233,10 @@ const actions = {
   axes: withRefresh(() => viewer.toggleAxes()),
   theme: withRefresh(() => applyTheme(viewer.theme === 'dark' ? 'light' : 'dark')),
   fit: () => viewer.frame({ keepDirection: true }),
+  center: () => viewer.centerModel(),
+  rotate: withRefresh(() => setTool('rotate')),
+  pan: withRefresh(() => setTool('pan')),
+  zoom: withRefresh(() => setTool('zoom')),
   screenshot: () => saveScreenshot().catch((err) => console.error('Screenshot failed:', err)),
   playPause: () => viewer.player?.toggle(),
   previousFile: () => stepFile(-1).catch(console.error),
@@ -235,6 +245,9 @@ const actions = {
 
 const isActive = (id) =>
   ({
+    rotate: viewer.tool === 'rotate',
+    pan: viewer.tool === 'pan',
+    zoom: viewer.tool === 'zoom',
     shaded: viewer.mode === 'shaded',
     wireframe: viewer.mode === 'wireframe',
     edges: viewer.mode === 'edges',
@@ -245,9 +258,8 @@ const isActive = (id) =>
 
 refreshButtons = setupTopbar(document.getElementById('topbar-buttons'), actions, isActive);
 refreshButtons();
-setupHints(document.getElementById('hints'));
 const resetPlayer = setupPlayer(document.getElementById('player'), viewer);
-setupAutoHide(['topbar', 'hints', 'player'].map((id) => document.getElementById(id)));
+setupAutoHide(['topbar', 'player'].map((id) => document.getElementById(id)));
 setupShortcuts(actions);
 
 /* ---------------- Drag & drop ---------------- */
