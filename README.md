@@ -52,7 +52,3 @@ npm install
 npm run tauri dev      # run the desktop app
 npm run tauri build    # installers in src-tauri/target/release/bundle/
 ```
-
-`npm run dev` runs the viewer in a browser at http://localhost:1420 (no file associations or folder access there).
-
-Built with [Tauri](https://tauri.app) and [three.js](https://threejs.org). Design notes and decisions: [plan.md](plan.md).
