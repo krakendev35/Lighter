@@ -9,14 +9,16 @@
   <body>
     <div id="viewport"></div>
 
-    <!-- Top bar (auto-hides; wired up in ui.js) -->
-    <header id="topbar" class="hidden">
+    <!-- Top bar and key hints: shown on mouse move, hidden after ~2 s (ui.js) -->
+    <header id="topbar">
       <div class="file">
         <span id="file-name"></span>
         <span id="file-meta"></span>
       </div>
-      <div class="buttons"><!-- icon buttons come in milestone 3 --></div>
+      <div id="topbar-buttons" class="buttons"></div>
     </header>
+
+    <div id="hints"></div>
 
     <!-- Empty state -->
     <section id="empty">
@@ -26,7 +28,7 @@
       </svg>
       <h1>Drop a 3D file here</h1>
       <p>or press <kbd>Ctrl</kbd> + <kbd>O</kbd></p>
-      <button id="open-btn" type="button">Open file</button>
+      <button id="open-btn" class="outline-btn" type="button">Open file</button>
       <p class="formats">STL · OBJ · glTF · GLB · FBX · PLY · 3MF</p>
     </section>
 

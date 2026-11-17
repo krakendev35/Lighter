@@ -2,35 +2,123 @@
 
 const HIDE_AFTER_MS = 2000;
 
-/** Show the top bar while the mouse moves; hide it after ~2 s idle. */
-export function setupAutoHide(topbar) {
+// Thin-line 18px icons, 1.5px stroke (see theme.css for stroke settings).
+const ICONS = {
+  open: '<path d="M2.5 4.5h4.5l1.5 1.5h7v8.5h-13z"/>',
+  shaded:
+    '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13a3.5 6.5 0 0 0 0-13z" fill="currentColor" stroke="none"/>',
+  wireframe: '<circle cx="9" cy="9" r="6.5"/><ellipse cx="9" cy="9" rx="2.8" ry="6.5"/><path d="M2.5 9h13"/>',
+  edges:
+    '<path d="M9 2.5l6 3.25v6.5L9 15.5l-6-3.25v-6.5z" fill="currentColor" fill-opacity=".3"/><path d="M3 5.75 9 9l6-3.25M9 9v6.5"/>',
+  clay: '<circle cx="9" cy="8" r="5"/><path d="M4.5 15.5h9"/>',
+  grid: '<rect x="2.5" y="2.5" width="13" height="13" rx="1"/><path d="M2.5 7h13M2.5 11h13M7 2.5v13M11 2.5v13"/>',
+  axes: '<path d="M5.5 12.5V2.5M5.5 12.5h10M5.5 12.5 2 16"/>',
+  theme: '<circle cx="9" cy="9" r="6.5"/><path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
+};
+
+// '|' = divider between button groups.
+const BUTTONS = [
+  { id: 'open', title: 'Open file (Ctrl+O)' },
+  '|',
+  { id: 'shaded', title: 'Shaded' },
+  { id: 'wireframe', title: 'Wireframe (W)' },
+  { id: 'edges', title: 'Shaded + edges (E)' },
+  { id: 'clay', title: 'Clay (C)' },
+  '|',
+  { id: 'grid', title: 'Grid (G)' },
+  { id: 'axes', title: 'Axes' },
+  '|',
+  { id: 'theme', title: 'Light / dark theme' },
+];
+
+const HINTS = [
+  ['W', 'Wireframe'],
+  ['E', 'Edges'],
+  ['C', 'Clay'],
+  ['G', 'Grid'],
+  ['F', 'Fit'],
+];
+
+/**
+ * Build the top-bar buttons. `actions[id]()` runs on click and `isActive(id)`
+ * says whether a button shows as toggled on. Returns a refresh() function to
+ * call whenever the state changes.
+ */
+export function setupTopbar(container, actions, isActive) {
+  const buttons = {};
+  for (const b of BUTTONS) {
+    if (b === '|') {
+      container.insertAdjacentHTML('beforeend', '<span class="divider"></span>');
+      continue;
+    }
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'icon-btn';
+    el.title = b.title;
+    el.setAttribute('aria-label', b.title);
+    el.innerHTML = `<svg viewBox="0 0 18 18" width="18" height="18">${ICONS[b.id]}</svg>`;
+    el.addEventListener('click', () => actions[b.id]());
+    container.appendChild(el);
+    buttons[b.id] = el;
+  }
+
+  return function refresh() {
+    for (const [id, el] of Object.entries(buttons)) {
+      el.classList.toggle('active', isActive(id));
+    }
+  };
+}
+
+export function setupHints(container) {
+  container.innerHTML = HINTS.map(([key, label]) => `<span><kbd>${key}</kbd>${label}</span>`).join('');
+}
+
+/**
+ * Controls appear when the mouse moves and fade out after ~2 s without
+ * movement or while orbiting. They stay while the cursor is over them.
+ */
+export function setupAutoHide(panels) {
   let timer = null;
-  let hovering = false;
+  let hovering = 0;
+  const show = (on) => document.body.classList.toggle('controls-visible', on);
 
-  topbar.addEventListener('mouseenter', () => (hovering = true));
-  topbar.addEventListener('mouseleave', () => (hovering = false));
+  for (const panel of panels) {
+    panel.addEventListener('mouseenter', () => hovering++);
+    panel.addEventListener('mouseleave', () => (hovering = Math.max(0, hovering - 1)));
+  }
 
-  window.addEventListener('mousemove', () => {
-    if (!topbar.dataset.enabled) return;
-    topbar.classList.remove('hidden');
+  window.addEventListener('mousemove', (e) => {
     clearTimeout(timer);
+    // Dragging on the 3D view = orbiting/panning: keep the view clear.
+    if (e.buttons && e.target.closest('#viewport')) {
+      show(false);
+      return;
+    }
+    show(true);
     timer = setTimeout(function hide() {
-      if (hovering) timer = setTimeout(hide, HIDE_AFTER_MS);
-      else topbar.classList.add('hidden');
+      if (hovering > 0) timer = setTimeout(hide, HIDE_AFTER_MS);
+      else show(false);
     }, HIDE_AFTER_MS);
   });
 }
 
-/** Write file name and short meta into the top bar. */
-export function setFileInfo(name, { triangles, size }) {
-  document.getElementById('file-name').textContent = name;
+/** Write file name, short meta and the detail tooltip into the top bar. */
+export function setFileInfo(name, { triangles, vertices, size }, { format, bytes }) {
   const fmt = (n) => (n >= 100 ? Math.round(n) : n.toFixed(1));
+  const nameEl = document.getElementById('file-name');
+  nameEl.textContent = name;
+  nameEl.title = `${format.toUpperCase()} · ${vertices.toLocaleString('en-US')} vertices · ${formatBytes(bytes)}`;
   document.getElementById('file-meta').textContent =
     `${triangles.toLocaleString('en-US')} tris · ${fmt(size.x)} × ${fmt(size.y)} × ${fmt(size.z)}`;
-  document.getElementById('topbar').dataset.enabled = '1';
 }
 
-/** Global keyboard shortcuts. `actions` is a map of handlers. */
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+
+/** Global keyboard shortcuts. `actions` is the same map the top bar uses. */
 export function setupShortcuts(actions) {
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key.toLowerCase() === 'o') {
@@ -38,13 +126,15 @@ export function setupShortcuts(actions) {
       actions.open();
       return;
     }
-    if (e.ctrlKey || e.altKey || e.metaKey) return;
-    switch (e.key.toLowerCase()) {
-      case 'f':
-        actions.frame();
-        break;
-      // TODO (milestone 3): W wireframe, E edges, C clay, G grid
-      // TODO (milestone 5): ← → previous / next file
-    }
+    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+    const key = {
+      w: 'toggleWireframe',
+      e: 'toggleEdges',
+      c: 'clay',
+      g: 'grid',
+      f: 'fit',
+    }[e.key.toLowerCase()];
+    if (key) actions[key]();
+    // TODO (milestone 5): ← → previous / next file
   });
 }
