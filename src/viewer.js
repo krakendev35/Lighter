@@ -25,6 +25,7 @@ export const THEMES = {
 
 const ISO_DIRECTION = new THREE.Vector3(1, 0.8, 1).normalize();
 const SNAP_MS = 300;
+const POLE_EPS = 1e-4; // radians away from straight up/down
 
 export class Viewer {
   constructor(container) {
@@ -141,31 +142,44 @@ export class Viewer {
     this.controls.update();
   }
 
-  /** Animate the camera to look at the model from `direction` (view cube). */
+  /**
+   * Animate the camera to look at the model from `direction` (view cube).
+   *
+   * The camera moves in spherical coordinates (around the vertical axis and
+   * up/down separately) so it never swings over the top or bottom pole, which
+   * would flip the view. For TOP / BOTTOM the current rotation around the
+   * vertical axis is kept, so the model doesn't spin when you look down on it
+   * from the back.
+   */
   viewFrom(direction) {
-    const target = this.controls.target;
-    const from = this.camera.position.clone().sub(target);
-    const distance = from.length();
-    from.normalize();
-    const to = direction.clone().normalize();
-    // Looking exactly straight down/up confuses the orbit controls; nudge it.
-    if (Math.abs(to.y) > 0.999) to.set(0, Math.sign(to.y), 1e-4).normalize();
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const from = new THREE.Spherical().setFromVector3(offset);
+    const to = new THREE.Spherical().setFromVector3(direction.clone().normalize());
+    to.radius = from.radius;
+
+    const isTopOrBottom = Math.abs(direction.clone().normalize().y) > 0.999;
+    if (isTopOrBottom) to.theta = from.theta;
+    // Never sit exactly on a pole: the orbit controls can't tell which way is up there.
+    to.phi = THREE.MathUtils.clamp(to.phi, POLE_EPS, Math.PI - POLE_EPS);
+
+    // Turn the short way round (e.g. 350° → 10° goes +20°, not −340°).
+    let dTheta = to.theta - from.theta;
+    dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
 
     this.snap = {
       from,
-      distance,
-      rotation: new THREE.Quaternion().setFromUnitVectors(from, to),
+      dTheta,
+      dPhi: to.phi - from.phi,
       start: performance.now(),
     };
   }
 
   stepSnap(now) {
-    const { from, distance, rotation, start } = this.snap;
+    const { from, dTheta, dPhi, start } = this.snap;
     const t = Math.min(1, (now - start) / SNAP_MS);
     const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const q = new THREE.Quaternion().slerp(rotation, eased);
-    const offset = from.clone().applyQuaternion(q).multiplyScalar(distance);
-    this.camera.position.copy(this.controls.target).add(offset);
+    const current = new THREE.Spherical(from.radius, from.phi + dPhi * eased, from.theta + dTheta * eased);
+    this.camera.position.setFromSpherical(current).add(this.controls.target);
     this.camera.lookAt(this.controls.target);
     if (t === 1) {
       this.snap = null;

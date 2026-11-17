@@ -54,8 +54,8 @@ html, body {
   pointer-events: none;
   transition: opacity 200ms ease;
 }
-body.controls-visible #topbar,
-body.controls-visible #hints {
+body.has-model.controls-visible #topbar,
+body.has-model.controls-visible #hints {
   opacity: 1;
   pointer-events: auto;
 }
