@@ -3,6 +3,12 @@
 A lightweight 3D viewer for Windows — a replacement for the removed "3D Viewer".
 Open a 3D file and look at it: no editing, no accounts, no cloud. About 1.5 MB to install.
 
+![Lighter showing an animated robot arm with edges, grid and axes](docs/screenshots/viewer.png)
+
+| Start screen | Guide panel (H) | Light theme, textured OBJ |
+|---|---|---|
+| ![Start screen](docs/screenshots/start.png) | ![Guide panel listing every shortcut](docs/screenshots/guide.png) | ![Light theme with a textured model](docs/screenshots/light.png) |
+
 **[Download the latest release](https://github.com/krakendev35/Lighter/releases/latest)** — run `Lighter_x.y.z_x64-setup.exe`.
 The installer isn't code-signed, so Windows may say "Windows protected your PC": choose **More info → Run anyway**.
 
