@@ -1,6 +1,6 @@
 [package]
 name = "lighter"
-version = "0.1.0"
+version = "1.0.0"
 description = "Lighter — a lightweight 3D viewer"
 edition = "2021"
 

@@ -11,7 +11,7 @@
 - Executable / installer: `Lighter.exe`, `Lighter_<version>_x64-setup.exe` (and `.msi`).
 - Tauri `productName`: `Lighter`; bundle identifier: `com.lighter.viewer` (change if the user has a preferred reverse-domain).
 - "Open with" / file-association display name: `Lighter`.
-- **Icon: TBD — the user will provide it later.** Until then use a placeholder (thin monochrome cube outline, as in the empty state). When it arrives, generate all sizes with `npx tauri icon <source.png>` (source ideally 1024×1024 PNG, transparent background).
+- **Icon (decided for 1.0.0): the thin monochrome cube outline** (same as the empty state). Source: `src-tauri/icons/placeholder.svg`; regenerate all sizes with `npx tauri icon <source>` if it ever changes.
 
 ## Goal
 A replacement for the removed Windows "3D Viewer": open a 3D file and look at it. No editing, no modelling, no extra features.
