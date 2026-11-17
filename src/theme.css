@@ -1,0 +1,100 @@
+/* Poppins, bundled with the app (never loaded from the internet). */
+@font-face { font-family: 'Poppins'; font-weight: 400; font-style: normal; font-display: block; src: url('./fonts/Poppins-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 500; font-style: normal; font-display: block; src: url('./fonts/Poppins-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 600; font-style: normal; font-display: block; src: url('./fonts/Poppins-SemiBold.woff2') format('woff2'); }
+
+:root,
+[data-theme='dark'] {
+  --bg: #0d0d0d;
+  --panel: #141414;
+  --border: #2a2a2a;
+  --text: #f2f2f2;
+  --text-2: #8a8a8a;
+  --hover: #222;
+  --active-bg: #ffffff;
+  --active-fg: #000000;
+  --chip: #1c1c1c;
+  --grid: #262626;
+  --wire: #e6e6e6;
+}
+
+[data-theme='light'] {
+  --bg: #f2f2f2;
+  --panel: #ffffff;
+  --border: #dcdcdc;
+  --text: #111;
+  --text-2: #6b6b6b;
+  --hover: #e8e8e8;
+  --active-bg: #000000;
+  --active-fg: #ffffff;
+  --chip: #f2f2f2;
+  --grid: #d9d9d9;
+  --wire: #1a1a1a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  user-select: none;
+}
+
+#viewport { position: fixed; inset: 0; }
+#viewport canvas { display: block; }
+
+/* ---------- Top bar ---------- */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  transition: opacity 200ms ease;
+}
+#topbar.hidden { opacity: 0; pointer-events: none; }
+#topbar .file { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+#file-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+#file-meta { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Empty state ---------- */
+#empty {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  color: var(--text-2);
+  pointer-events: none;
+}
+#empty.gone { display: none; }
+#empty .cube { color: var(--text); margin-bottom: 8px; }
+#empty h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
+#empty p { margin: 0; }
+#empty .formats { margin-top: 12px; font-size: 11px; }
+#empty button { pointer-events: auto; }
+body.dragging #empty { color: var(--text); }
+
+kbd {
+  font-family: inherit; font-size: 11px;
+  padding: 1px 6px;
+  background: var(--chip);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+button {
+  font: inherit; font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 14px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+button:hover { background: var(--hover); }

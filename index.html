@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lighter</title>
+    <link rel="stylesheet" href="/src/theme.css" />
+  </head>
+  <body>
+    <div id="viewport"></div>
+
+    <!-- Top bar (auto-hides; wired up in ui.js) -->
+    <header id="topbar" class="hidden">
+      <div class="file">
+        <span id="file-name"></span>
+        <span id="file-meta"></span>
+      </div>
+      <div class="buttons"><!-- icon buttons come in milestone 3 --></div>
+    </header>
+
+    <!-- Empty state -->
+    <section id="empty">
+      <svg class="cube" viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+        <path d="M32 6 56 19v26L32 58 8 45V19z" />
+        <path d="M8 19l24 13 24-13M32 32v26" />
+      </svg>
+      <h1>Drop a 3D file here</h1>
+      <p>or press <kbd>Ctrl</kbd> + <kbd>O</kbd></p>
+      <button id="open-btn" type="button">Open file</button>
+      <p class="formats">STL · OBJ · glTF · GLB</p>
+    </section>
+
+    <input id="file-input" type="file" accept=".stl,.obj,.gltf,.glb" hidden />
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
