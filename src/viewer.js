@@ -110,6 +110,10 @@ export class Viewer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    // Resizing wipes the canvas, and this runs after the frame's normal draw
+    // but before it reaches the screen. Draw again right away, or the model
+    // vanishes for as long as the size keeps changing (e.g. the guide sliding).
+    this.renderer.render(this.scene, this.camera);
   }
 
   /* ---------------- Model ---------------- */
